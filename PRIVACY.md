@@ -66,7 +66,7 @@
 
 ## 8. 联系我们
 
-隐私相关请求请提交 GitHub Issue：<https://github.com/YOUR_ACCOUNT/ask-ai/issues>
+隐私相关请求请提交 GitHub Issue：<https://github.com/maxzxc0110/ask-ai/issues>
 
 ---
 

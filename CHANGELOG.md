@@ -71,6 +71,6 @@
 - `tools/make_icons.py` —— 生成图标
 - `tools/store-shots.py` —— 生成商店展示图
 
-[1.2.0]: https://github.com/YOUR_ACCOUNT/ask-ai/releases/tag/v1.2.0
-[1.1.0]: https://github.com/YOUR_ACCOUNT/ask-ai/releases/tag/v1.1.0
-[1.0.0]: https://github.com/YOUR_ACCOUNT/ask-ai/releases/tag/v1.0.0
+[1.2.0]: https://github.com/maxzxc0110/ask-ai/releases/tag/v1.2.0
+[1.1.0]: https://github.com/maxzxc0110/ask-ai/releases/tag/v1.1.0
+[1.0.0]: https://github.com/maxzxc0110/ask-ai/releases/tag/v1.0.0

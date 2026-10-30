@@ -7,7 +7,7 @@
 ## 本地跑起来
 
 ```bash
-git clone <repo>
+git clone https://github.com/maxzxc0110/ask-ai.git
 cd ask-ai
 ```
 

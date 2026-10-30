@@ -169,7 +169,7 @@ ask-ai/
 ## 开发
 
 ```bash
-git clone <repo>
+git clone https://github.com/maxzxc0110/ask-ai.git
 cd ask-ai
 
 node tools/validate.mjs     # 自检：manifest / 协议构造 / 工具调用 / DOM 引用 / 会话逻辑 / Markdown / 卫生检查
