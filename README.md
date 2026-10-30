@@ -81,8 +81,10 @@ OpenAI · Claude · Gemini · DeepSeek · Kimi(Moonshot) · 智谱 GLM · 通义
 4. 点 **加载已解压的扩展程序**，选择**仓库根目录**（就是有 `manifest.json` 的那一层）
 5. 点工具栏图标打开侧边栏 → 右上角齿轮填 API Key
 
-> 想把运行文件和文档分开？`python tools/sync-extension.py` 会把扩展运行文件复制到
-> `../ask-ai-extension/`，之后加载那个目录即可（`--check` 只比对差异，`--clean` 顺手清理多余文件）。
+仓库根目录本身就是完整可用的扩展，**直接加载它即可**（`docs/`、`tools/`、`dist/`、`.git/`
+这些 Chrome 会自动忽略）。只有想把运行文件和文档分开时，才需要
+`python tools/sync-extension.py` 把运行文件复制到另一个目录再加载那个目录
+（`--check` 只比对差异，`--clean` 顺手清理多余文件）。
 
 > 需要 Chrome 114+（侧边栏 API）。Edge、Opera、Brave 等 Chromium 内核浏览器同样可用。
 

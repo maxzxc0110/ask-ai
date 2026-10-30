@@ -5,9 +5,12 @@
 
 需要本机装有 Chrome；路径会自动按脚本位置推导，不含任何个人绝对路径。
 """
+import http.server
 import os
 import shutil
+import socketserver
 import subprocess
+import threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -30,49 +33,21 @@ SHOTS = os.path.join(ROOT, "docs", "screenshots")
 os.makedirs(VIEW, exist_ok=True)
 os.makedirs(SHOTS, exist_ok=True)
 
-for f in ("sidepanel.css", "sidepanel.html", "sidepanel.js", "providers.js", "options.css", "options.html", "options.js"):
+for f in ("sidepanel.css", "sidepanel.html", "sidepanel.js", "providers.js", "page-tools.js",
+          "options.css", "options.html", "options.js"):
     shutil.copy(os.path.join(ROOT, f), os.path.join(VIEW, f))
+shutil.copy(os.path.join(HERE, "store-shot-fill.js"), os.path.join(VIEW, "store-shot-fill.js"))
 
-# ---- 对话态 demo（静态消息）----
-demo = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
-<link rel="stylesheet" href="sidepanel.css"></head><body>
-<header class="topbar">
-  <div class="tb-left"><span class="mark"></span>
-    <div class="session-wrap"><button class="session-btn"><span>这篇讲了什么</span>
-      <svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button></div>
-  </div>
-  <div class="tb-right"><select id="provider"><option>Claude</option></select>
-    <button class="icon-btn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3.1"/><path d="M19.1 14.5a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.7 2.7l-.1-.1a1.5 1.5 0 0 0-2.6 1v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-2.6-1l-.1.1a1.9 1.9 0 1 1-2.7-2.7l.1-.1a1.5 1.5 0 0 0-1-2.6h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1-2.6l-.1-.1a1.9 1.9 0 1 1 2.7-2.7l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 2.6 1l.1-.1a1.9 1.9 0 1 1 2.7 2.7l-.1.1a1.5 1.5 0 0 0 1 2.6h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9z"/></svg></button></div>
-</header>
-<section class="ctxcard">
-  <div class="ctx-left"><span class="ctx-dot ok"></span>
-    <div class="ctx-text"><div class="ctx-title">用 Rust 写一个高性能 HTTP 代理 - 知乎</div>
-    <div class="ctx-sub">4821 字 · 选区 128 字</div></div></div>
-  <div class="ctx-right"><button class="pill is-on">附带正文</button>
-    <button class="icon-btn sm"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button></div>
-</section>
-<main class="thread">
-  <div class="msg user"><div class="bubble">这篇讲的核心思路是什么？和 Nginx 比呢？</div></div>
-  <div class="msg assistant">
-    <div class="msg-role">Claude</div>
-    <div class="bubble">
-      <p>这篇的核心是<strong>自研事件循环 + 零拷贝</strong>两条主线：</p>
-      <ul><li>用 <code>io_uring</code> 替代 epoll，单线程就能扛 12 万 QPS</li><li>零拷贝转发省掉两次 <code>memcpy</code>，吞吐提升约 40%</li></ul>
-      <h3>和 Nginx 的差异</h3>
-      <p>Nginx 是多进程 + 共享内存模型，而它是单线程异步，延迟更稳但单机上限更低。</p>
-      <pre><code>accept_loop → epoll_wait → read → write</code></pre>
-      <p>建议先看第 3 节的 benchmark 表，<a href="https://example.com" target="_blank" rel="noreferrer noopener">原文在这里</a>。</p>
-    </div>
-    <div class="msg-tools"><button>复制</button><button>重新生成</button></div>
-  </div>
-</main>
-<footer class="composer">
-  <div class="composer-box"><textarea id="input" rows="1" placeholder="问问这个页面…"></textarea>
-    <button class="send"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></button></div>
-  <div class="composer-foot"><span>正文 4821 字</span><span class="sep">·</span><span>claude-sonnet-4-5</span><span class="sep">·</span><span>Enter 发送</span></div>
-</footer>
-</body></html>"""
-open(os.path.join(VIEW, "demo.html"), "w", encoding="utf-8").write(demo)
+# 对话态：直接用真实的 sidepanel.html，只把模块脚本换成填充脚本，
+# 这样截图里的结构永远和真实界面一致，不会再出现「截图是旧版」的情况。
+with open(os.path.join(VIEW, "sidepanel.html"), encoding="utf-8") as f:
+    _real = f.read()
+_chat = _real.replace(
+    '<script type="module" src="sidepanel.js"></script>',
+    '<script src="store-shot-fill.js"></script>',
+)
+with open(os.path.join(VIEW, "chat.html"), "w", encoding="utf-8") as f:
+    f.write(_chat)
 
 # ---- 模拟网页 ----
 MOCK = """
@@ -130,20 +105,58 @@ body { display: flex; background: #eef1f5; font-family: "Segoe UI", "PingFang SC
 """
 
 
-def composer(name, panel_page):
-    return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>{MOCK_CSS}</style></head>
-<body>{MOCK}<div class="panel-holder"><iframe src="file:///{VIEW.replace(chr(92), '/')}/{panel_page}"></iframe></div>
-</body></html>"""
+PORT = 8733
 
+
+class Quiet(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+
+def serve(directory):
+    handler = lambda *a, **kw: Quiet(*a, directory=directory, **kw)  # noqa: E731
+    httpd = socketserver.TCPServer(("127.0.0.1", PORT), handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd
+
+
+def composer(name, panel_page, fill=False):
+    # 填充代码由父页面在 iframe 加载完成后注入并立即执行：
+    # 无头截图时 iframe 里的 <script src> 不一定来得及跑，注入更可靠。
+    fill_js = ""
+    if fill:
+        with open(os.path.join(HERE, "store-shot-fill.js"), encoding="utf-8") as f:
+            fill_js = f.read()
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>{MOCK_CSS}</style></head>
+<body>{MOCK}<div class="panel-holder"><iframe id="panel" src="http://127.0.0.1:{PORT}/{panel_page}"></iframe></div>
+<script>
+(function () {{
+  var FILL = {fill_js!r};
+  var f = document.getElementById('panel');
+  f.addEventListener('load', function () {{
+    var doc = f.contentDocument;
+    if (!doc) return;
+    var s = doc.createElement('script');
+    s.textContent = FILL;
+    doc.body.appendChild(s);
+  }});
+}})();
+</script>
+</body></html>"""
+    path = os.path.join(VIEW, "c-" + name + ".html")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(html)
+    return path
+
+
+httpd = serve(VIEW)
 
 jobs = [
-    ("01-overview.png", composer("overview", "sidepanel.html")),
-    ("02-chat.png", composer("chat", "demo.html")),
+    ("01-overview.png", composer("overview", "sidepanel.html", fill=False)),
+    ("02-chat.png", composer("chat", "chat.html", fill=True)),
 ]
 
-for name, html in jobs:
-    p = os.path.join(DEV, "c-" + name + ".html")
-    open(p, "w", encoding="utf-8").write(html)
+for name, p in jobs:
     out = os.path.join(SHOTS, name)
     if os.path.exists(out):
         os.remove(out)
@@ -152,7 +165,7 @@ for name, html in jobs:
             CHROME, "--headless", "--disable-gpu", "--no-first-run", "--allow-file-access-from-files",
             f"--user-data-dir={PROFILE}", "--virtual-time-budget=6000",
             "--window-size=1280,800", "--hide-scrollbars", f"--screenshot={out}",
-            "file:///" + p.replace(chr(92), "/"),
+            "http://127.0.0.1:%d/%s" % (PORT, os.path.basename(p)),
         ],
         capture_output=True, text=True, timeout=180,
     )
@@ -162,8 +175,8 @@ for name, html in jobs:
 opt = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 html,body{{margin:0;height:100%;background:#fff}}
 iframe{{width:1280px;height:800px;border:0;display:block}}</style></head>
-<body><iframe src="file:///{VIEW.replace(chr(92), '/')}/options.html"></iframe></body></html>"""
-p = os.path.join(DEV, "c-options.html")
+<body><iframe src="http://127.0.0.1:{PORT}/options.html"></iframe></body></html>"""
+p = os.path.join(VIEW, "c-options.html")
 open(p, "w", encoding="utf-8").write(opt)
 out = os.path.join(SHOTS, "03-settings.png")
 if os.path.exists(out):
@@ -173,8 +186,10 @@ subprocess.run(
         CHROME, "--headless", "--disable-gpu", "--no-first-run", "--allow-file-access-from-files",
         f"--user-data-dir={PROFILE}", "--virtual-time-budget=6000",
         "--window-size=1280,800", "--hide-scrollbars", f"--screenshot={out}",
-        "file:///" + p.replace(chr(92), "/"),
+        "http://127.0.0.1:%d/%s" % (PORT, os.path.basename(p)),
     ],
     capture_output=True, text=True, timeout=180,
 )
 print("03-settings.png", os.path.exists(out), os.path.getsize(out) if os.path.exists(out) else 0)
+
+httpd.shutdown()
