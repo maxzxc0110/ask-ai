@@ -81,6 +81,9 @@ OpenAI · Claude · Gemini · DeepSeek · Kimi(Moonshot) · 智谱 GLM · 通义
 4. 点 **加载已解压的扩展程序**，选择**仓库根目录**（就是有 `manifest.json` 的那一层）
 5. 点工具栏图标打开侧边栏 → 右上角齿轮填 API Key
 
+> 想把运行文件和文档分开？`python tools/sync-extension.py` 会把扩展运行文件复制到
+> `../ask-ai-extension/`，之后加载那个目录即可（`--check` 只比对差异，`--clean` 顺手清理多余文件）。
+
 > 需要 Chrome 114+（侧边栏 API）。Edge、Opera、Brave 等 Chromium 内核浏览器同样可用。
 
 也可以直接下载发布包自己解压后加载：`python tools/pack.py` 会在 `dist/` 生成 zip。
@@ -151,6 +154,7 @@ ask-ai/
 │  ├─ validate.mjs      自检脚本（node tools/validate.mjs）
 │  ├─ test-tools.py     页面工具的真实浏览器功能测试（需本机 Chrome）
 │  ├─ test-agent.py     Agent 循环端到端测试（chrome 桩 + 真实 sidepanel.js）
+│  ├─ sync-extension.py 把运行文件同步到「加载已解压」用的目录
 │  ├─ pack.py           打包 zip
 │  ├─ make_icons.py     生成图标（需 Pillow）
 │  └─ store-shots.py    生成商店展示图（需本机 Chrome）
@@ -169,6 +173,7 @@ cd ask-ai
 node tools/validate.mjs     # 自检：manifest / 协议构造 / 工具调用 / DOM 引用 / 会话逻辑 / Markdown / 卫生检查
 python tools/test-tools.py  # 页面工具功能测试：真 Chrome 里跑点击 / 填值 / 快照
 python tools/test-agent.py  # Agent 循环端到端测试：真 Chrome 里跑通「模型请求动作 → 执行 → 回传 → 继续」
+python tools/sync-extension.py  # 同步运行文件到 ../ask-ai-extension（本地加载用）
 python tools/pack.py        # 打包 → dist/*.zip
 python tools/make_icons.py  # 重新生成图标（需要 pillow）
 ```

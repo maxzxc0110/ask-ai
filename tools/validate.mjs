@@ -269,6 +269,8 @@ for (const f of ['tools/test-tools.py', 'tools/test-tools.html', 'tools/test-age
   ok(fs.existsSync(path.join(DIR, f)), '存在 ' + f);
 }
 ok(/test-agent\.py/.test(read('.github/workflows/ci.yml')), 'CI 里跑了端到端测试');
+ok(fs.existsSync(path.join(DIR, 'tools/sync-extension.py')), '存在 tools/sync-extension.py');
+ok(/from pack import RUNTIME/.test(read('tools/sync-extension.py')), '同步脚本与打包脚本共用同一份文件清单');
 
 // 打包清单必须覆盖所有本地 import，否则装成 zip 会白屏
 const packPy = read('tools/pack.py');
