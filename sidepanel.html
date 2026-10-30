@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Ask AI · 网页问答助手</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="tb-left">
+      <span class="mark" aria-hidden="true"></span>
+      <div class="session-wrap">
+        <button class="session-btn" id="session-btn" title="切换会话" aria-haspopup="true" aria-expanded="false">
+          <span id="session-title">新会话</span>
+          <svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+        <div class="session-menu" id="session-menu" hidden>
+          <button class="menu-new" id="menu-new">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+            新建会话
+          </button>
+          <div class="menu-list" id="menu-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tb-right">
+      <select id="provider" title="切换 AI 供应商"></select>
+      <button id="open-options" class="icon-btn" title="设置" aria-label="设置">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="12" cy="12" r="3.1" />
+          <path d="M19.1 14.5a1.5 1.5 0 0 0 .3 1.7l.1.1a1.9 1.9 0 1 1-2.7 2.7l-.1-.1a1.5 1.5 0 0 0-2.6 1v.2a1.9 1.9 0 1 1-3.8 0v-.1a1.5 1.5 0 0 0-2.6-1l-.1.1a1.9 1.9 0 1 1-2.7-2.7l.1-.1a1.5 1.5 0 0 0-1-2.6h-.2a1.9 1.9 0 1 1 0-3.8h.1a1.5 1.5 0 0 0 1-2.6l-.1-.1a1.9 1.9 0 1 1 2.7-2.7l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.2a1.9 1.9 0 1 1 3.8 0v.1a1.5 1.5 0 0 0 2.6 1l.1-.1a1.9 1.9 0 1 1 2.7 2.7l-.1.1a1.5 1.5 0 0 0 1 2.6h.2a1.9 1.9 0 1 1 0 3.8h-.1a1.5 1.5 0 0 0-1.4.9z" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <section class="ctxcard">
+    <div class="ctx-left">
+      <span class="ctx-dot" id="ctx-dot"></span>
+      <div class="ctx-text">
+        <div class="ctx-title" id="ctx-title">正在读取当前页面…</div>
+        <div class="ctx-sub" id="ctx-meta">—</div>
+      </div>
+    </div>
+    <div class="ctx-right">
+      <button class="pill is-on" id="toggle-body" title="是否把网页正文一起发给 AI">附带正文</button>
+      <button class="icon-btn sm" id="refresh" title="重新读取页面" aria-label="重新读取页面">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v6h-6" />
+        </svg>
+      </button>
+    </div>
+  </section>
+
+  <main class="thread" id="thread">
+    <div class="empty" id="empty">
+      <div class="greet">
+        <div class="greet-mark" aria-hidden="true"></div>
+        <h1>你好，我是 Ask AI</h1>
+        <p>我能读到你正在看的这个网页。问我任何关于它的问题。</p>
+      </div>
+      <div class="suggestions" id="quick">
+        <button class="chip" data-q="用三句话概括这个页面的核心内容">概括这一页</button>
+        <button class="chip" data-q="我正在这个页面上卡住，帮我判断下一步该怎么做">我卡在哪</button>
+        <button class="chip" data-q="把页面里最关键的数据、结论和风险点列成清单">提取要点</button>
+        <button class="chip" data-q="用通俗的话解释这个页面的专业术语和概念">解释术语</button>
+        <button class="chip" data-q="把这一页翻译成英文，保留术语原词">翻译成英文</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="composer">
+    <div class="composer-box">
+      <textarea id="input" rows="1" placeholder="问问这个页面…"></textarea>
+      <button id="send" class="send" title="发送 (Enter)" aria-label="发送">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 19V5" /><path d="M5 12l7-7 7 7" />
+        </svg>
+      </button>
+      <button id="stop" class="send stop" title="停止生成" aria-label="停止" hidden>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+      </button>
+    </div>
+    <div class="composer-foot">
+      <span id="ctx-size">—</span>
+      <span class="sep">·</span>
+      <span id="model-tag">—</span>
+      <span class="sep">·</span>
+      <span>Enter 发送</span>
+    </div>
+  </footer>
+
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>

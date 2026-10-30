@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>隐私政策 — Ask AI · 网页问答助手</title>
+<style>
+  :root { --text:#1f2023; --text2:#5f6368; --text3:#8b9096; --line:#e3e8ef; --blue:#1a73e8; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:48px 20px 80px; background:#f7f9fc; color:var(--text);
+    font-family:"Google Sans","Segoe UI","PingFang SC","Microsoft YaHei UI",system-ui,sans-serif;
+    font-size:15px; line-height:1.8; }
+  .wrap { max-width:760px; margin:0 auto; }
+  h1 { font-size:28px; margin:0 0 6px; letter-spacing:-.01em; }
+  .sub { color:var(--text3); font-size:13px; margin:0 0 30px; }
+  section { background:#fff; border:1px solid var(--line); border-radius:16px; padding:26px 30px; margin-bottom:16px; }
+  h2 { font-size:17px; margin:0 0 12px; }
+  h3 { font-size:14.5px; margin:20px 0 6px; }
+  p, li { color:var(--text2); }
+  ul { padding-left:20px; }
+  strong { color:var(--text); }
+  .tag { display:inline-block; padding:2px 9px; border-radius:999px; background:#e8f0fe; color:var(--blue);
+    font-size:12px; font-weight:600; margin-right:6px; }
+  .en { border-top:1px dashed var(--line); margin-top:26px; padding-top:20px; }
+  .en h2 { font-size:15px; color:var(--text2); }
+  footer { color:var(--text3); font-size:12.5px; text-align:center; margin-top:26px; }
+  a { color:var(--blue); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>隐私政策</h1>
+  <p class="sub">Ask AI · 网页问答助手 · 最近更新：2026 年 10 月 30 日</p>
+
+  <section>
+    <p><span class="tag">一句话</span><strong>本扩展不收集、不上传、不出售任何数据。</strong>你的 API Key 和对话记录只存在你自己浏览器的本地存储里。</p>
+  </section>
+
+  <section>
+    <h2>1. 我们收集什么</h2>
+    <p><strong>什么都不收集。</strong>扩展不包含任何分析、广告或遥测 SDK，不会向开发者发送你的浏览记录、页面内容、对话内容或任何标识信息。</p>
+    <p>扩展内不存在任何自有服务器或中转接口，全部代码都在扩展包内本地运行。</p>
+  </section>
+
+  <section>
+    <h2>2. 本地存储了什么</h2>
+    <p>以下内容仅保存在你本机的 <code>chrome.storage.local</code> 中，只在你自己的浏览器里，卸载扩展即被删除：</p>
+    <ul>
+      <li>你在设置页填写的 API Key、模型名、Base URL 与其他偏好设置；</li>
+      <li>各会话的对话历史（提问与回答）。</li>
+    </ul>
+    <p>这些数据不会被加密后上传，也不会同步到任何服务器。</p>
+  </section>
+
+  <section>
+    <h2>3. 什么时候会向外部发送数据</h2>
+    <p>只有当你<strong>主动点击发送</strong>时，扩展才会把下列内容发往<strong>你在设置页配置的 AI 服务商</strong>：</p>
+    <ul>
+      <li>你输入的问题；</li>
+      <li>当前网页的正文（默认截断到设定字数，可通过「附带正文」开关完全关闭）；</li>
+      <li>你在页面上选中的文字；</li>
+      <li>当前会话的上下文历史。</li>
+    </ul>
+    <p>该服务商如何处理这些数据，取决于它自己的隐私政策与条款，不受本扩展控制。请只选择你信任的服务商。</p>
+  </section>
+
+  <section>
+    <h2>4. 权限说明</h2>
+    <ul>
+      <li><code>&lt;all_urls&gt;</code>：读取任意页面的正文文本，这是「读取并问答当前网页」这一核心功能所必需的；</li>
+      <li><code>scripting</code>：在页面中注入脚本以提取正文；</li>
+      <li><code>tabs</code> / <code>activeTab</code>：获知当前活动标签页，以便在你切换页面时刷新正文并按页面切换会话；</li>
+      <li><code>storage</code>：保存上述本地设置与会话历史；</li>
+      <li><code>sidePanel</code>：在浏览器侧边栏中显示扩展界面。</li>
+    </ul>
+    <p>扩展不读取你的浏览历史记录（History API）、Cookie、书签、已保存密码或下载记录。</p>
+  </section>
+
+  <section>
+    <h2>5. 儿童隐私</h2>
+    <p>本扩展不面向 13 岁以下儿童，也不会有意收集儿童的个人信息。</p>
+  </section>
+
+  <section>
+    <h2>6. 政策变更</h2>
+    <p>若未来更新扩展并改变数据处理方式（例如新增统计功能），我们会先更新本页面并<strong>在扩展内明示</strong>，同时在 Chrome 商店更新隐私标签。政策变更会同步反映在扩展包中。</p>
+  </section>
+
+  <section>
+    <h2>7. 联系我们</h2>
+    <p>问题或隐私相关请求：<a href="mailto:YOUR_EMAIL@example.com">YOUR_EMAIL@example.com</a>（请替换成你的真实邮箱）</p>
+  </section>
+
+  <section class="en">
+    <h2>English summary</h2>
+    <p><strong>Ask AI · Web Q&amp;A Sidebar collects nothing.</strong> No analytics, no ads, no telemetry, no server of our own. Your API key and chat history stay in your browser's local storage.</p>
+    <p>Only when you press send, the page text, your selection and your question are transmitted to <strong>the AI provider you configured in the settings</strong>. That provider's handling of the data is governed by its own policy.</p>
+    <p>The <code>&lt;all_urls&gt;</code> permission is required to read the text of the page you are asking about. The extension does not read your browsing history, cookies, bookmarks, saved passwords or downloads.</p>
+    <p>Contact: <a href="mailto:YOUR_EMAIL@example.com">YOUR_EMAIL@example.com</a></p>
+  </section>
+
+  <footer>Ask AI · 网页问答助手 — 独立开发者项目，与 OpenAI、Anthropic、Google 等厂商无隶属关系。</footer>
+</div>
+</body>
+</html>

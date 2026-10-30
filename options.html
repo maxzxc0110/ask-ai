@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Ask AI · 网页问答助手 — 设置</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="sheet">
+    <header class="head">
+      <div class="head-left">
+        <span class="mark" aria-hidden="true"></span>
+        <div>
+          <h1>Ask&nbsp;AI · 网页问答助手</h1>
+          <p>填入你自己的 API Key，用订阅对应的模型回答当前网页的问题。Key 只保存在本机浏览器里。</p>
+        </div>
+      </div>
+      <div class="head-right">
+        <span id="save-flag" class="save-flag">已保存</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="panel">
+        <h2 class="panel-title"><span class="num">01</span>供应商</h2>
+
+        <label class="field">
+          <span class="lbl">AI 产品</span>
+          <select id="provider"></select>
+          <span class="hint" id="key-hint">—</span>
+        </label>
+
+        <label class="field">
+          <span class="lbl">接口协议</span>
+          <select id="protocol">
+            <option value="auto">自动（按上方供应商）</option>
+            <option value="openai">OpenAI 格式（/v1/chat/completions）</option>
+            <option value="anthropic">Anthropic 格式（/v1/messages）</option>
+            <option value="gemini">Gemini 格式（:generateContent）</option>
+          </select>
+          <span class="hint" id="protocol-hint">中转站/自建服务常常只提供其中一种格式，选错了会返回 404 或参数错误。</span>
+        </label>
+
+        <label class="field">
+          <span class="lbl">API Key</span>
+          <div class="secret">
+            <input id="apiKey" type="password" spellcheck="false" autocomplete="off" placeholder="sk-..." />
+            <button id="peek" type="button" class="ghost" title="显示 / 隐藏">显示</button>
+          </div>
+          <span class="hint">保存在 chrome.storage.local，本机不上传。</span>
+        </label>
+
+        <label class="field">
+          <span class="lbl">模型</span>
+          <input id="model" list="model-list" spellcheck="false" placeholder="例如 gpt-4o-mini" />
+          <datalist id="model-list"></datalist>
+          <span class="hint">模型名会变，直接手填最稳；下拉里是该供应商的常用值。</span>
+        </label>
+
+        <label class="field">
+          <span class="lbl">Base URL（可选）</span>
+          <input id="baseUrl" type="url" spellcheck="false" placeholder="留空则使用供应商默认地址" />
+          <span class="hint">自建 new-api / one-api / LM Studio 时填这里。</span>
+        </label>
+
+        <div class="row">
+          <button id="test" class="btn">测试连接</button>
+          <span id="test-result" class="test-result"></span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title"><span class="num">02</span>上下文</h2>
+
+        <label class="field">
+          <span class="lbl">附带的页面正文字数上限</span>
+          <input id="maxChars" type="number" min="500" max="120000" step="500" />
+          <span class="hint">正文越多越准，但也更费 token、越可能超上下文。建议 8000–20000。</span>
+        </label>
+
+        <label class="field">
+          <span class="lbl">最大回复长度（tokens）</span>
+          <input id="maxTokens" type="number" min="256" max="32768" step="256" />
+        </label>
+
+        <label class="field">
+          <span class="lbl">温度</span>
+          <div class="temp">
+            <input id="temperature" type="range" min="0" max="1.5" step="0.1" />
+            <output id="temperature-out" class="mono">0.3</output>
+          </div>
+          <span class="hint">回答当前网页问题建议 0.2–0.5；想让它发挥发散就调高。</span>
+        </label>
+
+        <label class="field">
+          <span class="lbl">系统提示词</span>
+          <textarea id="systemPrompt" rows="6"></textarea>
+          <span class="hint">决定 AI 的角色与风格，例如「只依据页面内容作答，不确定就说不知道」。</span>
+        </label>
+
+        <label class="field switch-field">
+          <span class="lbl">打开新页面时自动开新会话</span>
+          <span class="switch">
+            <input type="checkbox" id="autoSession" />
+            <span class="track"><span class="knob"></span></span>
+          </span>
+          <span class="hint">关闭后，所有页面共用当前这个会话。</span>
+        </label>
+      </section>
+    </div>
+
+    <footer class="foot">
+      <span class="mono" id="foot-note">Ask AI · 网页问答助手 v1.0.0</span>
+      <div class="foot-actions">
+        <button id="reset" class="ghost danger">恢复默认</button>
+        <button id="save" class="btn solid">保存</button>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# 打包产物 / 构建中间文件
+dist/
+.tmp-store-shots/
+*.zip
+
+# 本地开发
+node_modules/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+*.log
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
