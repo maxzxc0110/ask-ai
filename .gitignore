@@ -18,5 +18,6 @@ desktop.ini
 
 # 测试临时产物
 .test-agent.html
+.chrome-*/
 .chrome-*-profile/
 .tools-cache/
