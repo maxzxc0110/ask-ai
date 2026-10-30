@@ -2,14 +2,35 @@
   "manifest_version": 3,
   "name": "Ask AI · 网页问答助手",
   "description": "在侧边栏用你自己的 AI（OpenAI / Claude / Gemini / DeepSeek / Kimi / GLM / 通义 / OpenRouter / Ollama）读取并问答当前网页。",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "minimum_chrome_version": "114",
-  "permissions": ["sidePanel", "storage", "scripting", "tabs", "activeTab"],
-  "host_permissions": ["<all_urls>"],
-  "background": { "service_worker": "background.js" },
-  "action": { "default_title": "打开 Ask AI 侧边栏", "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" } },
-  "side_panel": { "default_path": "sidepanel.html" },
-  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "scripting",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "打开 Ask AI 侧边栏",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

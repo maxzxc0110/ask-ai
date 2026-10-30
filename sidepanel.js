@@ -4,7 +4,9 @@ const $ = (s) => document.querySelector(s);
 
 const els = {
   provider: $('#provider'),
+  model: $('#model'),
   options: $('#open-options'),
+  newSession: $('#new-session'),
   sessionBtn: $('#session-btn'),
   sessionMenu: $('#session-menu'),
   menuNew: $('#menu-new'),
@@ -19,7 +21,6 @@ const els = {
   refresh: $('#refresh'),
   thread: $('#thread'),
   empty: $('#empty'),
-  quick: $('#quick'),
   input: $('#input'),
   send: $('#send'),
   stop: $('#stop'),
@@ -29,7 +30,8 @@ const DEFAULTS = {
   providerId: 'openai',
   protocol: 'auto', // auto | openai | anthropic | gemini
   apiKey: '',
-  model: '',
+  model: '',        // 当前选中的模型
+  models: [],       // 该订阅可用的模型列表（可多个）
   baseUrl: '',
   maxChars: 14000,
   temperature: 0.3,
@@ -84,11 +86,61 @@ const hostOf = (u) => {
 async function loadSettings() {
   const got = await chrome.storage.local.get(['settings']);
   settings = { ...DEFAULTS, ...(got.settings || {}) };
+  // 老版本只有一个 model 字段 → 迁移成模型列表
+  if (!Array.isArray(settings.models)) {
+    settings.models = settings.model ? [settings.model] : [];
+  }
+  settings.models = settings.models.filter(Boolean);
 }
 
 async function saveSettings(patch) {
   settings = { ...settings, ...patch };
   await chrome.storage.local.set({ settings });
+}
+
+/* ---------------- 模型列表 ---------------- */
+
+/** 当前订阅下可用的模型（用户填的优先，否则用供应商默认） */
+function availableModels() {
+  const list = Array.isArray(settings.models) ? settings.models.filter(Boolean) : [];
+  if (list.length) return list;
+  const p = getProvider(settings.providerId);
+  return p.models.slice();
+}
+
+function currentModel() {
+  const list = availableModels();
+  if (settings.model && list.includes(settings.model)) return settings.model;
+  return list[0] || settings.model || '';
+}
+
+/** 刷新模型下拉 */
+function fillModelSelect(preferred) {
+  const list = availableModels();
+  const keep = preferred || (sessions[sessionId] && sessions[sessionId].model) || settings.model;
+  els.model.innerHTML = '';
+  for (const m of list) {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m;
+    els.model.append(opt);
+  }
+  if (!list.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '未设置模型';
+    els.model.append(opt);
+  }
+  const pick = list.includes(keep) ? keep : list[0] || '';
+  els.model.value = pick;
+  if (pick) settings.model = pick;
+  updateModelTag();
+}
+
+function updateModelTag() {
+  const p = getProvider(settings.providerId);
+  const kind = settings.protocol && settings.protocol !== 'auto' ? settings.protocol : p.kind;
+  els.modelTag.textContent = (settings.model || '未选模型') + ' · ' + kind;
 }
 
 /* ---------------- 会话读写 ---------------- */
@@ -145,9 +197,19 @@ function switchSession(id) {
   sessionId = id;
   currentByWin[windowId] = id;
   messages = sessions[id].messages;
+  // 每个会话记住自己用的模型，切回来时恢复
+  fillModelSelect(sessions[id].model);
   render();
   renderSessionMenu();
   saveSessions();
+}
+
+/** 新建一个独立会话（不绑定页面） */
+function startNewSession() {
+  const id = createSession(null);
+  switchSession(id);
+  closeMenu();
+  els.input.focus();
 }
 
 function touch() {
@@ -445,12 +507,22 @@ async function send(text) {
   els.input.value = '';
   autoGrow();
 
+  // 本次使用的模型（下拉里当前选中的）
+  const useModel = els.model.value || currentModel();
+  if (useModel) settings.model = useModel;
+
   const sel = page.selection ? '\n（我选中的是：' + page.selection.slice(0, 300) + '）' : '';
   messages.push({ role: 'user', text: question + sel });
 
-  const assistant = { role: 'assistant', text: '', streaming: true, providerLabel: provider.label };
+  const assistant = {
+    role: 'assistant',
+    text: '',
+    streaming: true,
+    providerLabel: provider.label + (useModel ? ' · ' + useModel : ''),
+  };
   messages.push(assistant);
   const idx = messages.length - 1;
+  if (sessionId && sessions[sessionId]) sessions[sessionId].model = useModel;
   render();
   touch();
 
@@ -571,13 +643,24 @@ function bind() {
   els.provider.addEventListener('change', async () => {
     const p = getProvider(els.provider.value);
     const model = p.models[0] || settings.model;
-    await saveSettings({ providerId: p.id, model });
-    els.modelTag.textContent = model || '未选模型';
+    await saveSettings({ providerId: p.id, model, models: p.models.slice() });
+    fillModelSelect(model);
     if (!settings.apiKey && p.id !== 'ollama') openOptions();
+  });
+
+  els.model.addEventListener('change', async () => {
+    const m = els.model.value;
+    if (!m) return;
+    settings.model = m;
+    if (sessionId && sessions[sessionId]) sessions[sessionId].model = m;
+    await saveSettings({ model: m });
+    saveSessions();
+    updateModelTag();
   });
 
   els.options.addEventListener('click', openOptions);
   els.refresh.addEventListener('click', refreshContext);
+  els.newSession.addEventListener('click', startNewSession);
 
   els.sessionBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -585,12 +668,7 @@ function bind() {
     else closeMenu();
   });
 
-  els.menuNew.addEventListener('click', () => {
-    const id = createSession(null);
-    switchSession(id);
-    closeMenu();
-    els.input.focus();
-  });
+  els.menuNew.addEventListener('click', startNewSession);
 
   document.addEventListener('click', (e) => {
     if (!els.sessionMenu.hidden && !e.target.closest('.session-wrap')) closeMenu();
@@ -617,15 +695,6 @@ function bind() {
 
   els.input.addEventListener('input', autoGrow);
 
-  els.quick.addEventListener('click', (e) => {
-    const card = e.target.closest('.chip');
-    if (!card) return;
-    els.input.value = card.dataset.q || '';
-    autoGrow();
-    els.input.focus();
-    send(els.input.value);
-  });
-
   chrome.tabs.onActivated.addListener(() => handleUrlChange());
   chrome.tabs.onUpdated.addListener((_tabId, info) => {
     if (info.status === 'complete') handleUrlChange();
@@ -650,9 +719,7 @@ async function init() {
   ).join('');
   els.provider.value = settings.providerId;
 
-  const p = getProvider(settings.providerId);
-  const protocolTag = settings.protocol && settings.protocol !== 'auto' ? settings.protocol : p.kind;
-  els.modelTag.textContent = (settings.model || p.models[0] || '未选模型') + ' · ' + protocolTag;
+  fillModelSelect();
   els.toggleBody.classList.toggle('is-on', settings.includeBody !== false);
 
   bind();

@@ -98,10 +98,42 @@ console.log('\n[5] 会话逻辑');
 ok(/function sessionForUrl/.test(sideJs), '存在 sessionForUrl（按页面找会话）');
 ok(/function createSession/.test(sideJs), '存在 createSession');
 ok(/function switchSession/.test(sideJs), '存在 switchSession');
+ok(/function startNewSession/.test(sideJs), '存在 startNewSession（新建会话入口）');
 ok(/urlIndex\[normUrl\(url\)\] = id/.test(sideJs), '新会话写入 urlIndex');
 ok(/autoSession/.test(sideJs), '支持 autoSession 开关');
 ok(/const changed = url !== lastUrl/.test(sideJs), '仅在 URL 变化时自动切会话');
 ok(/createSession\(null\)/.test(sideJs), '手动新建为独立会话');
+ok(sideIds.has('new-session'), '顶栏有独立的 #new-session 按钮');
+ok(/els\.newSession\.addEventListener\('click', startNewSession\)/.test(sideJs), '新建按钮已绑定事件');
+
+// 会话下拉必须盖在上下文卡之上，否则点不到（.topbar 是 flex item，z-index 对其生效）
+const css = read('sidepanel.css');
+const zOf = (sel) => {
+  const m = new RegExp('\\' + sel + '\\s*\\{[^}]*z-index:\\s*(\\d+)', 's').exec(css);
+  return m ? Number(m[1]) : 0;
+};
+ok(zOf('.topbar') > zOf('.ctxcard'),
+  `.topbar z-index(${zOf('.topbar')}) > .ctxcard z-index(${zOf('.ctxcard')})，会话下拉不会被遮挡`);
+ok(/\.session-menu\s*\{[^}]*position:\s*absolute/s.test(css), '会话下拉是绝对定位，可浮在内容之上');
+
+console.log('\n[5b] 多模型支持');
+ok(sideIds.has('model'), '侧边栏有 #model 下拉');
+ok(/function availableModels/.test(sideJs), '存在 availableModels');
+ok(/function fillModelSelect/.test(sideJs), '存在 fillModelSelect');
+ok(/sessions\[sessionId\]\.model = m/.test(sideJs), '切换模型会记住到当前会话');
+ok(/settings\.models/.test(sideJs), 'settings.models 参与模型列表');
+ok(optIds.has('models'), '设置页有 #models 字段');
+ok(!optIds.has('model'), '设置页不再有单模型字段 #model');
+ok(!sideIds.has('quick'), '首页快捷提问卡片已移除');
+ok(!/\.suggestions|\.chip \{/.test(css), '快捷卡片样式已清理');
+
+// 解析模型列表：逗号 / 中文逗号 / 分号 / 换行都能分隔
+const pm = optJs.slice(optJs.indexOf('function parseModels'), optJs.indexOf('}', optJs.indexOf('function parseModels')) + 1);
+const parseModels = new Function(pm + '\nreturn parseModels;')();
+ok(JSON.stringify(parseModels('gpt-4o, gpt-4o-mini')) === JSON.stringify(['gpt-4o', 'gpt-4o-mini']), '英文逗号分隔');
+ok(JSON.stringify(parseModels('a，b；c\nd')) === JSON.stringify(['a', 'b', 'c', 'd']), '中文逗号/分号/换行分隔');
+ok(parseModels('  ').length === 0, '空输入返回空数组');
+ok(parseModels('a,,b').length === 2, '忽略空项');
 
 // 会话归一化与绑定逻辑（纯函数抽取验证）
 const normIdx = sideJs.indexOf('const normUrl');

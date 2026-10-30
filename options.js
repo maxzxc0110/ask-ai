@@ -7,6 +7,7 @@ const DEFAULTS = {
   protocol: 'auto',
   apiKey: '',
   model: '',
+  models: [],
   baseUrl: '',
   maxChars: 14000,
   temperature: 0.3,
@@ -24,7 +25,7 @@ const els = {
   protocol: $('#protocol'),
   protocolHint: $('#protocol-hint'),
   apiKey: $('#apiKey'),
-  model: $('#model'),
+  models: $('#models'),
   modelList: $('#model-list'),
   baseUrl: $('#baseUrl'),
   maxChars: $('#maxChars'),
@@ -44,6 +45,14 @@ const els = {
 
 let settings = { ...DEFAULTS };
 
+/** "a, b ,c" → ["a","b","c"] */
+function parseModels(text) {
+  return String(text || '')
+    .split(/[,，;；\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 const PROTOCOL_NOTE = {
   auto: '中转站/自建服务常常只提供其中一种格式，选错了会返回 404 或参数错误。',
   openai: 'POST {Base URL}/chat/completions，Authorization: Bearer。绝大多数中转站与自建服务都是这个格式。',
@@ -52,11 +61,13 @@ const PROTOCOL_NOTE = {
 };
 
 function readForm() {
+  const models = parseModels(els.models.value);
   return {
     providerId: els.provider.value,
     protocol: els.protocol.value,
     apiKey: els.apiKey.value.trim(),
-    model: els.model.value.trim(),
+    models,
+    model: models.includes(settings.model) ? settings.model : (models[0] || settings.model || ''),
     baseUrl: els.baseUrl.value.trim(),
     maxChars: Number(els.maxChars.value) || DEFAULTS.maxChars,
     maxTokens: Number(els.maxTokens.value) || DEFAULTS.maxTokens,
@@ -70,7 +81,8 @@ function fillForm() {
   els.provider.value = settings.providerId;
   els.protocol.value = settings.protocol || 'auto';
   els.apiKey.value = settings.apiKey || '';
-  els.model.value = settings.model || '';
+  const list = Array.isArray(settings.models) ? settings.models : settings.model ? [settings.model] : [];
+  els.models.value = list.join(', ');
   els.baseUrl.value = settings.baseUrl || '';
   els.maxChars.value = settings.maxChars;
   els.maxTokens.value = settings.maxTokens;
@@ -85,7 +97,10 @@ function syncProvider() {
   const p = getProvider(els.provider.value);
   els.keyHint.textContent = p.keyHint;
   els.modelList.innerHTML = p.models.map((m) => '<option value="' + m + '"></option>').join('');
-  if (!els.model.value && p.models.length) els.model.value = p.models[0];
+  // 没填过模型时，用该供应商的常用模型做默认
+  if (!parseModels(els.models.value).length && p.models.length) {
+    els.models.value = p.models.join(', ');
+  }
 }
 
 function syncProtocol() {
@@ -149,7 +164,7 @@ function bind() {
     }
   });
 
-  ['apiKey', 'model', 'baseUrl', 'maxChars', 'maxTokens', 'systemPrompt', 'autoSession'].forEach((id) => {
+  ['apiKey', 'models', 'baseUrl', 'maxChars', 'maxTokens', 'systemPrompt', 'autoSession'].forEach((id) => {
     els[id].addEventListener('change', () => persist());
   });
 }
@@ -157,6 +172,9 @@ function bind() {
 async function init() {
   const got = await chrome.storage.local.get(['settings']);
   settings = { ...DEFAULTS, ...(got.settings || {}) };
+  if (!Array.isArray(settings.models)) {
+    settings.models = settings.model ? [settings.model] : [];
+  }
 
   els.provider.innerHTML = PROVIDER_LIST.map(
     (p) => '<option value="' + p.id + '">' + p.label + '</option>'

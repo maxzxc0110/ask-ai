@@ -51,10 +51,10 @@
         </label>
 
         <label class="field">
-          <span class="lbl">模型</span>
-          <input id="model" list="model-list" spellcheck="false" placeholder="例如 gpt-4o-mini" />
+          <span class="lbl">模型（可填多个，用逗号分隔）</span>
+          <input id="models" type="text" spellcheck="false" placeholder="gpt-4o, gpt-4o-mini, o3-mini" />
           <datalist id="model-list"></datalist>
-          <span class="hint">模型名会变，直接手填最稳；下拉里是该供应商的常用值。</span>
+          <span class="hint">一个订阅常常有多个模型，都填进来；它们会出现在侧边栏顶部的模型下拉里，随时切换。留空则用供应商默认模型。</span>
         </label>
 
         <label class="field">

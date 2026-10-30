@@ -32,8 +32,14 @@
 **会话**
 
 - 打开新页面（URL 变化）自动开新会话；同一页面反复追问留在原会话
-- 顶栏一键新建独立会话；下拉里可切回任意历史会话
+- 顶栏 **＋** 一键新建独立会话；会话名下拉里可切回任意历史会话
 - 会话历史存本地，关掉侧边栏再打开还在
+
+**多模型切换**
+
+- 一个订阅可以填多个模型（设置页用逗号分隔），顶栏下拉随时切换
+- 每个会话记住自己用的模型，切回来自动恢复
+- AI 产品（供应商）也可在顶栏直接切换
 
 **回答**
 
@@ -72,7 +78,7 @@ OpenAI · Claude · Gemini · DeepSeek · Kimi(Moonshot) · 智谱 GLM · 通义
 | AI 产品 | 选供应商，自动填默认 Base URL 与常用模型 |
 | 接口协议 | 自动 / OpenAI / Anthropic / Gemini，手动指定以适配中转站 |
 | API Key | 只保存在本机 `chrome.storage.local` |
-| 模型 | 模型名会变，直接手填最稳 |
+| 模型 | **可填多个**，用逗号分隔；它们会出现在侧边栏顶部的下拉里 |
 | Base URL | 自建 new-api / one-api / LM Studio 时填这里 |
 | 正文长度上限 | 建议 8000–20000 字 |
 | 温度 | 问答场景建议 0.2–0.5 |
@@ -153,6 +159,8 @@ python tools/make_icons.py  # 重新生成图标（需要 pillow）
 1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick the repo root (the folder containing `manifest.json`)
 2. Click the toolbar icon to open the side panel → gear icon → paste **your own API key** (OpenAI / Claude / Gemini / DeepSeek / Kimi / GLM / Qwen / OpenRouter / SiliconFlow / local Ollama / any OpenAI-compatible endpoint)
 3. Open any article and ask about it
+
+One subscription can expose several models: list them comma-separated in the settings, then switch between them from the dropdown at the top of the panel. Each conversation remembers the model it was using.
 
 The extension ships **no backend of its own** and collects nothing. Your key and chat history stay in your browser's local storage; page text and questions are sent only to the AI provider you configured, and only when you press send.
 
