@@ -14,6 +14,8 @@ const DEFAULTS = {
   maxTokens: 4096,
   includeBody: true,
   autoSession: true,
+  allowPageTools: true,
+  confirmDangerous: true,
   systemPrompt:
     '你是一个嵌在 Chrome 侧边栏里的网页助手。用户正在浏览一个网页，并把页面内容提供给你。' +
     '请基于页面内容作答：具体、直接、优先引用页面里的原文细节；页面里没有的信息就说明没有，不要编造。' +
@@ -34,6 +36,8 @@ const els = {
   temperatureOut: $('#temperature-out'),
   systemPrompt: $('#systemPrompt'),
   autoSession: $('#autoSession'),
+  allowPageTools: $('#allowPageTools'),
+  confirmDangerous: $('#confirmDangerous'),
   keyHint: $('#key-hint'),
   peek: $('#peek'),
   test: $('#test'),
@@ -74,6 +78,8 @@ function readForm() {
     temperature: Number(els.temperature.value),
     systemPrompt: els.systemPrompt.value,
     autoSession: els.autoSession.checked,
+    allowPageTools: els.allowPageTools.checked,
+    confirmDangerous: els.confirmDangerous.checked,
   };
 }
 
@@ -90,6 +96,8 @@ function fillForm() {
   els.temperatureOut.textContent = String(settings.temperature);
   els.systemPrompt.value = settings.systemPrompt;
   els.autoSession.checked = settings.autoSession !== false;
+  els.allowPageTools.checked = settings.allowPageTools !== false;
+  els.confirmDangerous.checked = settings.confirmDangerous !== false;
   syncProvider();
 }
 

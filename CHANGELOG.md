@@ -2,6 +2,30 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.0] - 2026-10-30
+
+### 新增
+
+- **页面工具**：AI 可以调用工具读当前页面的源码与网络请求清单，也可以操作页面
+  - `page_snapshot`：渲染后的 HTML、内联 CSS、外链 CSS/JS 原文、已加载的网络资源清单
+  - `read_page`：页面已渲染的可见文本
+  - `inspect`：元素标签 / 文本 / 属性 / 坐标 / CSS 路径
+  - `click`：点击元素（派发完整指针与鼠标事件序列，兼容 React/Vue）
+  - `fill`：填写输入框（走原生 setter，受控组件也能触发）
+  - `scroll`：滚动页面或滚动到某个元素
+- 三种协议都支持工具调用：OpenAI `tools`、Anthropic `tools`、Gemini `function_declarations`
+- Agent 循环：模型请求动作 → 扩展执行 → 结果回传 → 模型继续，最多 8 轮
+- **危险动作确认**：涉及支付 / 删除 / 注销 / 退订 / 密码验证码时先弹确认卡，点「允许一次」才执行
+- 侧边栏底部新增「⚙ 页面工具」快捷开关；设置页新增「允许 AI 操作当前页面」「危险操作需要我确认」
+- 工具调用过程以活动行展示在对话里（进行中 / 成功 / 失败 / 被拒绝）
+- 新增 `tools/test-tools.py`：在真实 Chrome 里跑页面工具功能测试
+
+### 说明
+
+- 不申请 `chrome.debugger` 权限，因此顶部不会出现「正在调试此浏览器」横幅
+- 外部 CSS/JS 原文由扩展上下文抓取，`<all_urls>` 权限可跨域获取
+- 网络请求清单来自 Resource Timing，只有元数据（URL / 类型 / 耗时 / 大小），不含请求体与响应体
+
 ## [1.1.0] - 2026-10-30
 
 ### 新增
@@ -47,5 +71,6 @@
 - `tools/make_icons.py` —— 生成图标
 - `tools/store-shots.py` —— 生成商店展示图
 
+[1.2.0]: https://github.com/YOUR_ACCOUNT/ask-ai/releases/tag/v1.2.0
 [1.1.0]: https://github.com/YOUR_ACCOUNT/ask-ai/releases/tag/v1.1.0
 [1.0.0]: https://github.com/YOUR_ACCOUNT/ask-ai/releases/tag/v1.0.0

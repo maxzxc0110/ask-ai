@@ -514,6 +514,7 @@ body {
 .composer-foot {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 6px;
   margin-top: 7px;
   padding: 0 8px;
@@ -522,7 +523,119 @@ body {
   color: var(--text-3);
 }
 
-.composer-foot .sep { opacity: 0.6; }
+.composer-foot .sep { opacity: 0.6; flex: none; }
+.composer-foot > span:not(.sep) {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-foot > span:last-child { flex: none; }
+
+/* ---------------- 页面工具：活动行 ---------------- */
+
+.activity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 4px;
+}
+
+.act-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  background: var(--bg-soft);
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.act-icon { flex: none; font-size: 11px; color: var(--text-3); }
+.act-name { flex: none; font-weight: 600; color: var(--text); }
+.act-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.act-row.s-running .act-icon { color: var(--blue); animation: act-blink 1s ease-in-out infinite; }
+.act-row.s-done .act-icon { color: var(--ok); }
+.act-row.s-error .act-icon { color: var(--danger); }
+.act-row.s-denied .act-icon { color: #b06000; }
+.act-row.s-error { border-color: #f3d6d4; background: #fdf4f3; }
+.act-row.s-denied { border-color: #f0e0c4; background: #fdf9f0; }
+
+@keyframes act-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* ---------------- 危险动作确认 ---------------- */
+
+.confirm-card {
+  margin: 6px 0 8px;
+  padding: 11px 12px;
+  border: 1px solid #f0d9a8;
+  border-left: 3px solid #e8a33d;
+  border-radius: 10px;
+  background: #fffaf0;
+  box-shadow: var(--shadow-1);
+}
+
+.cc-title { font-size: 12.5px; font-weight: 700; color: #8a5a00; }
+.cc-action {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--text);
+  word-break: break-all;
+}
+.cc-reason { margin-top: 2px; font-size: 11.5px; color: var(--text-3); }
+.cc-btns { display: flex; gap: 8px; margin-top: 9px; }
+
+.cc-btns button {
+  padding: 5px 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.16s, border-color 0.16s;
+}
+.cc-btns button:hover { background: var(--surface-2); }
+.cc-deny { color: var(--danger); }
+.cc-allow {
+  background: var(--blue) !important;
+  border-color: var(--blue) !important;
+  color: #fff !important;
+}
+.cc-allow:hover { background: #1765cc !important; }
+
+/* ---------------- 底部开关 ---------------- */
+
+.foot-chip {
+  flex: none;
+  white-space: nowrap;
+  padding: 1px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: background 0.16s, color 0.16s;
+}
+.foot-chip:hover { background: var(--surface-2); }
+.foot-chip.is-on { color: var(--blue); border-color: var(--blue-soft); background: var(--blue-soft); }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }

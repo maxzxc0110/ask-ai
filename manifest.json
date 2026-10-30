@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Ask AI · 网页问答助手",
   "description": "在侧边栏用你自己的 AI（OpenAI / Claude / Gemini / DeepSeek / Kimi / GLM / 通义 / OpenRouter / Ollama）读取并问答当前网页。",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "minimum_chrome_version": "114",
   "permissions": [
     "sidePanel",

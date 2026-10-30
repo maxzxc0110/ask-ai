@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>RESULTS</title>
+  <style>
+    body { font-family: monospace; padding: 16px; }
+    button { padding: 6px 12px; }
+  </style>
+</head>
+<body>
+  <h1>Ask AI 页面工具自测</h1>
+
+  <button id="btn" onclick="window.__clicked = (window.__clicked || 0) + 1">点我</button>
+  <input id="inp" type="text" />
+  <textarea id="ta"></textarea>
+  <input id="pwd" type="password" />
+  <div id="out">idle</div>
+
+  <script type="module">
+    import { pageToolExec } from '../page-tools.js';
+
+    const results = [];
+    const check = (name, cond, info) => results.push({ name, pass: !!cond, info: String(info == null ? '' : info) });
+
+    // 模拟 React 的受控输入：实例上装了 value 的 getter/setter
+    const reactInput = document.getElementById('inp');
+    const protoDesc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    let currentValue = '';
+    Object.defineProperty(reactInput, 'value', {
+      configurable: true,
+      get() { return protoDesc.get.call(this); },
+      set(v) { currentValue = '' + v; protoDesc.set.call(this, v); },
+    });
+
+    let inputEvents = 0;
+    reactInput.addEventListener('input', () => { inputEvents++; });
+
+    // 1. 点击
+    const r1 = pageToolExec({ action: 'click', selector: '#btn' });
+    check('click ok', r1.ok, r1.error || '');
+    check('click 触发处理器', window.__clicked === 1, 'clicked=' + window.__clicked);
+
+    // 2. 按文本点击
+    const r2 = pageToolExec({ action: 'click', text: '点我' });
+    check('click by text', r2.ok && window.__clicked === 2, 'clicked=' + window.__clicked + ' err=' + (r2.error || ''));
+
+    // 3. 填值（受控输入）
+    const r3 = pageToolExec({ action: 'fill', selector: '#inp', value: 'hello world' });
+    check('fill ok', r3.ok, r3.error || '');
+    check('fill 写入值', reactInput.value === 'hello world', 'value=' + reactInput.value);
+    check('fill 触发 input 事件', inputEvents >= 1, 'events=' + inputEvents);
+
+    // 4. 填 textarea
+    const r4 = pageToolExec({ action: 'fill', selector: '#ta', value: 'multi' });
+    check('fill textarea', r4.ok && document.getElementById('ta').value === 'multi', r4.error || document.getElementById('ta').value);
+
+    // 5. 找不到的元素
+    const r5 = pageToolExec({ action: 'click', selector: '#nope' });
+    check('缺失元素报错', r5.ok === false && !!r5.error, r5.error || '');
+
+    // 6. 非法选择器
+    const r6 = pageToolExec({ action: 'click', selector: '>>>bad' });
+    check('非法选择器报错', r6.ok === false && !!r6.error, r6.error || '');
+
+    // 7. 快照
+    const r7 = pageToolExec({ action: 'snapshot', part: 'all' });
+    check('snapshot ok', r7.ok, r7.error || '');
+    check('snapshot 含 HTML', typeof r7.html === 'string' && r7.html.indexOf('点我') >= 0, 'len=' + (r7.html || '').length);
+    check('snapshot 含网络清单', Array.isArray(r7.resources), 'count=' + (r7.resources || []).length);
+
+    // 8. 读正文
+    const r8 = pageToolExec({ action: 'read_page' });
+    check('read_page ok', r8.ok && r8.text.indexOf('Ask AI 页面工具自测') >= 0, r8.error || '');
+
+    // 9. inspect
+    const r9 = pageToolExec({ action: 'inspect', selector: '#btn' });
+    check('inspect ok', r9.ok && r9.tag === 'button' && r9.text === '点我', JSON.stringify(r9.tag) + ' ' + JSON.stringify(r9.text));
+
+    // 10. 滚动
+    const r10 = pageToolExec({ action: 'scroll', to: 'top' });
+    check('scroll ok', r10.ok, r10.error || '');
+
+    // 11. 未知动作
+    const r11 = pageToolExec({ action: 'nope' });
+    check('未知动作报错', r11.ok === false && !!r11.error, r11.error || '');
+
+    document.getElementById('out').textContent = JSON.stringify(results);
+    document.title = 'RESULTS:' + JSON.stringify(results);
+  </script>
+</body>
+</html>

@@ -41,6 +41,24 @@
 - 每个会话记住自己用的模型，切回来自动恢复
 - AI 产品（供应商）也可在顶栏直接切换
 
+**页面工具**（可选开关，默认关闭更省心）
+
+开启后 AI 可以直接「看」和「动」你当前的页面：
+
+| 工具 | 能做什么 |
+|---|---|
+| `page_snapshot` | 渲染后的 HTML、内联 CSS、外链 CSS/JS 原文、已加载的网络请求清单 |
+| `read_page` | 页面已渲染的可见文本 |
+| `inspect` | 元素的标签、文本、属性、坐标、CSS 路径 |
+| `click` | 点击元素（派发完整指针与鼠标事件序列，React/Vue 也能响应） |
+| `fill` | 填写输入框（走原生 setter，受控组件也能触发） |
+| `scroll` | 滚动页面 / 滚动到某个元素 |
+
+- 底部「⚙ 页面工具」一键开关，设置页也有
+- **危险动作会先问你**：支付、删除、注销、退订、密码验证码等，弹出确认卡等你点「允许一次」
+- 不申请 `debugger` 权限，顶部不会有「正在调试此浏览器」横幅
+- 网络请求清单只含元数据（URL / 类型 / 耗时 / 大小），不含请求体与响应体
+
 **回答**
 
 - 流式输出，可随时点停；支持 Markdown（标题、列表、代码块、链接）
@@ -83,6 +101,8 @@ OpenAI · Claude · Gemini · DeepSeek · Kimi(Moonshot) · 智谱 GLM · 通义
 | 正文长度上限 | 建议 8000–20000 字 |
 | 温度 | 问答场景建议 0.2–0.5 |
 | 打开新页面自动开新会话 | 关掉则所有页面共用一个会话 |
+| 允许 AI 操作当前页面 | 开启后 AI 能读页面源码、点按钮、填表单 |
+| 危险操作需要我确认 | 支付 / 删除 / 注销 / 密码这类动作先问你一句 |
 
 设置页有 **测试连接** 按钮，报错会直接给出 HTTP 状态和原因。
 
@@ -123,11 +143,14 @@ ask-ai/
 ├─ manifest.json        扩展清单（MV3）
 ├─ background.js        侧边栏打开行为
 ├─ providers.js         供应商定义 + 三种协议请求构造 + SSE 解析
-├─ sidepanel.html/.css/.js   侧边栏（会话管理 / 读页面 / 流式对话 / Markdown）
+├─ sidepanel.html/.css/.js   侧边栏（会话管理 / 读页面 / 流式对话 / Markdown / Agent 循环）
+├─ page-tools.js        页面工具定义 + 注入页面的执行器 + 危险动作判定
 ├─ options.html/.css/.js     设置页
 ├─ icons/               图标
 ├─ tools/
 │  ├─ validate.mjs      自检脚本（node tools/validate.mjs）
+│  ├─ test-tools.py     页面工具的真实浏览器功能测试（需本机 Chrome）
+│  ├─ test-agent.py     Agent 循环端到端测试（chrome 桩 + 真实 sidepanel.js）
 │  ├─ pack.py           打包 zip
 │  ├─ make_icons.py     生成图标（需 Pillow）
 │  └─ store-shots.py    生成商店展示图（需本机 Chrome）
@@ -143,7 +166,9 @@ ask-ai/
 git clone <repo>
 cd ask-ai
 
-node tools/validate.mjs     # 自检：manifest / 协议构造 / DOM 引用 / 会话逻辑 / Markdown / 卫生检查
+node tools/validate.mjs     # 自检：manifest / 协议构造 / 工具调用 / DOM 引用 / 会话逻辑 / Markdown / 卫生检查
+python tools/test-tools.py  # 页面工具功能测试：真 Chrome 里跑点击 / 填值 / 快照
+python tools/test-agent.py  # Agent 循环端到端测试：真 Chrome 里跑通「模型请求动作 → 执行 → 回传 → 继续」
 python tools/pack.py        # 打包 → dist/*.zip
 python tools/make_icons.py  # 重新生成图标（需要 pillow）
 ```
@@ -161,6 +186,8 @@ python tools/make_icons.py  # 重新生成图标（需要 pillow）
 3. Open any article and ask about it
 
 One subscription can expose several models: list them comma-separated in the settings, then switch between them from the dropdown at the top of the panel. Each conversation remembers the model it was using.
+
+Optional **page tools** let the AI read the page's HTML/CSS/JS source and network resource list, and click buttons, fill forms or scroll for you. Sensitive actions (payment, delete, logout, passwords) always ask for your confirmation first. The extension does not request the `debugger` permission, so no "being debugged" banner ever appears.
 
 The extension ships **no backend of its own** and collects nothing. Your key and chat history stay in your browser's local storage; page text and questions are sent only to the AI provider you configured, and only when you press send.
 

@@ -19,6 +19,7 @@ RUNTIME = [
     "manifest.json",
     "background.js",
     "providers.js",
+    "page-tools.js",
     "sidepanel.html",
     "sidepanel.css",
     "sidepanel.js",
@@ -30,6 +31,21 @@ RUNTIME = [
     "icons/icon48.png",
     "icons/icon128.png",
 ]
+
+
+def local_imports():
+    """扫描运行代码里 import 的本地模块，避免打包漏文件导致白屏"""
+    found = set()
+    for rel in RUNTIME:
+        if not rel.endswith(".js"):
+            continue
+        with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
+            src = f.read()
+        for m in re.finditer(r"""from\s+['"]\./([^'"]+)['"]""", src):
+            found.add(m.group(1))
+        for m in re.finditer(r"""import\(\s*['"]\./([^'"]+)['"]""", src):
+            found.add(m.group(1))
+    return found
 
 
 def main():
@@ -51,6 +67,11 @@ def main():
     missing = [f for f in RUNTIME if not os.path.exists(os.path.join(ROOT, f.replace("/", os.sep)))]
     if missing:
         raise SystemExit("缺少文件: " + ", ".join(missing))
+
+    # 防呆：本地 import 的模块必须都在包里
+    not_packed = sorted(local_imports() - set(RUNTIME))
+    if not_packed:
+        raise SystemExit("以下本地模块没有被打包（会导致白屏）: " + ", ".join(not_packed))
 
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for rel in RUNTIME:

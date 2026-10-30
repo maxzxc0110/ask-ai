@@ -13,6 +13,7 @@ const ok = (cond, msg) => {
   else { fails++; console.log('  FAIL  ' + msg); }
 };
 const read = (f) => fs.readFileSync(path.join(DIR, f), 'utf8');
+const provMod = await import(pathToFileURL(path.join(DIR, 'providers.js')).href);
 
 console.log('\n[1] manifest / 文件');
 const mf = JSON.parse(read('manifest.json'));
@@ -142,6 +143,147 @@ const normFn = new Function(normSrc + '\nreturn normUrl;')();
 ok(normFn('https://a.com/x#frag') === 'https://a.com/x', 'URL 去掉 hash');
 ok(normFn('https://a.com/x') === normFn('https://a.com/x#y'), '同页不同 hash 归一到同一会话');
 ok(normFn('https://a.com/x?q=1') !== normFn('https://a.com/x?q=2'), '不同 query 视为不同页面');
+
+console.log('\n[2b] 流式工具调用解析');
+const sse = (chunks) =>
+  new Response(
+    new ReadableStream({
+      start(c) {
+        for (const ch of chunks) c.enqueue(new TextEncoder().encode(ch));
+        c.close();
+      },
+    })
+  );
+
+// OpenAI：tool_calls 分片累加
+const oaSse = sse([
+  'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"click","arguments":"{\\"selector\\":"}}]}}]}\n\n',
+  'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"#btn\\"}"}}]}}]}\n\n',
+  'data: [DONE]\n\n',
+]);
+const oaOut = await provMod.streamCompletion(oaSse, 'openai', () => {});
+ok(oaOut.toolCalls.length === 1, 'openai 解析出 1 个工具调用');
+ok(oaOut.toolCalls[0] && oaOut.toolCalls[0].name === 'click', 'openai 工具名正确');
+ok(oaOut.toolCalls[0] && oaOut.toolCalls[0].args.selector === '#btn', 'openai 参数拼接正确');
+ok(oaOut.toolCalls[0] && oaOut.toolCalls[0].id === 'call_1', 'openai 工具调用 id 正确');
+
+// Anthropic：content_block_start + input_json_delta
+const anSse = sse([
+  'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"fill"}}\n\n',
+  'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"value\\":\\"a"}}\n\n',
+  'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"b\\"}"}}\n\n',
+]);
+const anOut = await provMod.streamCompletion(anSse, 'anthropic', () => {});
+ok(anOut.toolCalls.length === 1, 'anthropic 解析出 1 个工具调用');
+ok(anOut.toolCalls[0] && anOut.toolCalls[0].name === 'fill', 'anthropic 工具名正确');
+ok(anOut.toolCalls[0] && anOut.toolCalls[0].args.value === 'ab', 'anthropic 参数拼接正确');
+ok(anOut.toolCalls[0] && anOut.toolCalls[0].id === 'toolu_1', 'anthropic 工具调用 id 正确');
+
+// Gemini：functionCall
+const gmSse = sse([
+  'data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"scroll","args":{"to":"bottom"}}}]}}]}\n\n',
+]);
+const gmOut = await provMod.streamCompletion(gmSse, 'gemini', () => {});
+ok(gmOut.toolCalls.length === 1, 'gemini 解析出 1 个工具调用');
+ok(gmOut.toolCalls[0] && gmOut.toolCalls[0].name === 'scroll', 'gemini 工具名正确');
+ok(gmOut.toolCalls[0] && gmOut.toolCalls[0].args.to === 'bottom', 'gemini 参数正确');
+
+// 普通文本流不应产生工具调用
+const txtSse = sse(['data: {"choices":[{"delta":{"content":"你好"}}]}\n\n']);
+const txtOut = await provMod.streamCompletion(txtSse, 'openai', () => {});
+ok(txtOut.toolCalls.length === 0 && txtOut.text === '你好', '普通文本流不产生工具调用');
+
+console.log('\n[5c] 页面工具（读源码 / 操作页面）');
+ok(fs.existsSync(path.join(DIR, 'page-tools.js')), '文件存在 page-tools.js');
+const toolsSrc = read('page-tools.js');
+const toolMod = await import(pathToFileURL(path.join(DIR, 'page-tools.js')).href);
+
+ok(Array.isArray(toolMod.TOOLS) && toolMod.TOOLS.length === 6, '定义了 6 个页面工具');
+ok(new Set(toolMod.TOOLS.map((t) => t.name)).size === toolMod.TOOLS.length, '工具名唯一');
+ok(toolMod.TOOLS.every((t) => t.parameters && t.parameters.type === 'object'), '每个工具都有 JSON Schema');
+ok(toolMod.TOOLS.every((t) => toolMod.TOOL_LABELS[t.name]), '每个工具都有中文界面名');
+ok(/export function pageToolExec/.test(toolsSrc), 'pageToolExec 可注入页面执行');
+ok(/getEntriesByType\('resource'\)/.test(toolsSrc), '能读取网络资源清单');
+ok(/outerHTML/.test(toolsSrc), '能读取页面 HTML');
+ok(/querySelectorAll\('link\[rel~="stylesheet"\]'\)/.test(toolsSrc), '能收集外链 CSS');
+ok(/querySelectorAll\('script\[src\]'\)/.test(toolsSrc), '能收集外链 JS');
+ok(/PointerEvent/.test(toolsSrc), '点击派发完整指针事件序列');
+ok(/HTMLInputElement\.prototype/.test(toolsSrc), '填值走原生 setter（兼容 React）');
+
+// 危险动作判定
+ok(toolMod.isDangerous('click', { text: '确认支付' }).danger, '支付类点击判为危险');
+ok(toolMod.isDangerous('click', { text: '删除账号' }).danger, '删除类点击判为危险');
+ok(toolMod.isDangerous('fill', { selector: 'input[type=password]' }).danger, '密码字段判为危险');
+ok(!toolMod.isDangerous('click', { text: '展开更多' }).danger, '普通点击不判为危险');
+ok(!toolMod.isDangerous('page_snapshot', {}).danger, '读源码不判为危险');
+
+// 三种协议的工具格式（真实调用 buildRequest）
+const fakeProvider = { id: 'x', label: 'X', kind: 'openai', base: 'https://x.test/v1', models: ['m'] };
+const fakeTools = [{ name: 'click', description: 'd', parameters: { type: 'object', properties: { selector: { type: 'string' } } } }];
+const mkSettings = (protocol) => ({ apiKey: 'k', model: 'm', protocol, maxTokens: 1024, temperature: 0.2 });
+const turns = [
+  { role: 'user', text: 'hi' },
+  { role: 'assistant', text: '', toolCalls: [{ id: 'call_1', name: 'click', args: { selector: '#x' } }] },
+  { role: 'tool', toolCallId: 'call_1', name: 'click', result: { ok: true, label: '按钮' } },
+];
+
+const oaBody = JSON.parse(provMod.buildRequest(fakeProvider, mkSettings('openai'), 'sys', turns, fakeTools).init.body);
+ok(!!oaBody.tools && oaBody.tools[0].type === 'function', 'openai 请求带 function 工具声明');
+ok(oaBody.tools[0].function.name === 'click', 'openai 工具名正确');
+ok(oaBody.messages.some((m) => m.role === 'tool' && m.tool_call_id === 'call_1'), 'openai 回传工具结果');
+ok(oaBody.messages.some((m) => m.tool_calls && m.tool_calls[0].function.name === 'click'), 'openai 回传工具调用');
+
+const anBody = JSON.parse(provMod.buildRequest(fakeProvider, mkSettings('anthropic'), 'sys', turns, fakeTools).init.body);
+ok(!!anBody.tools && anBody.tools[0].input_schema, 'anthropic 请求带 input_schema');
+ok(anBody.messages.some((m) => JSON.stringify(m.content).includes('tool_use')), 'anthropic 回传工具调用');
+ok(anBody.messages.some((m) => JSON.stringify(m.content).includes('tool_result')), 'anthropic 回传工具结果');
+
+const gmBody = JSON.parse(provMod.buildRequest(fakeProvider, mkSettings('gemini'), 'sys', turns, fakeTools).init.body);
+ok(!!gmBody.tools && !!gmBody.tools[0].function_declarations, 'gemini 请求带 functionDeclarations');
+ok(JSON.stringify(gmBody.contents).includes('functionCall'), 'gemini 回传工具调用');
+ok(JSON.stringify(gmBody.contents).includes('functionResponse'), 'gemini 回传工具结果');
+
+// 不带工具时不该出现 tools 字段
+const noTools = JSON.parse(provMod.buildRequest(fakeProvider, mkSettings('openai'), 'sys', turns, []).init.body);
+ok(!noTools.tools, '关闭工具时不发 tools 字段');
+
+// 侧边栏的 Agent 循环
+ok(/MAX_TOOL_ROUNDS/.test(sideJs), '有工具轮次上限');
+ok(/async function runTool/.test(sideJs), '有工具执行器');
+ok(/async function execInPage/.test(sideJs), '有页面注入执行');
+ok(/function requestConfirm/.test(sideJs), '有危险动作确认');
+ok(/isDangerous\(/.test(sideJs), '危险判定已接入');
+ok(/role: 'tool'/.test(sideJs), '工具结果回传给模型');
+ok(/toolsOn \? TOOLS : \[\]/.test(sideJs), '按开关决定是否下发工具');
+ok(/allowPageTools/.test(sideJs) && /confirmDangerous/.test(sideJs), '两个开关都接上了');
+ok(sideIds.has('toggle-tools'), '侧边栏有页面工具开关');
+ok(/^\.activity\s*\{/m.test(css) && /^\.act-row\s*\{/m.test(css), '工具活动行有样式');
+ok(/^\.confirm-card\s*\{/m.test(css), '确认卡片有样式');
+ok(optIds.has('allowPageTools') && optIds.has('confirmDangerous'), '设置页有页面工具开关');
+// 承诺过不申请 debugger 权限
+ok(!mf.permissions.includes('debugger'), '未申请 debugger 权限（不出现调试横幅）');
+ok(!/chrome\.debugger\./.test(sideJs) && !/chrome\.debugger\./.test(toolsSrc), '代码未调用 chrome.debugger API');
+
+// 端到端测试脚手架必须在
+for (const f of ['tools/test-tools.py', 'tools/test-tools.html', 'tools/test-agent.py', 'tools/test-agent-stub.js', 'tools/test-agent-run.js']) {
+  ok(fs.existsSync(path.join(DIR, f)), '存在 ' + f);
+}
+ok(/test-agent\.py/.test(read('.github/workflows/ci.yml')), 'CI 里跑了端到端测试');
+
+// 打包清单必须覆盖所有本地 import，否则装成 zip 会白屏
+const packPy = read('tools/pack.py');
+const packList = packPy.slice(packPy.indexOf('RUNTIME = ['), packPy.indexOf(']', packPy.indexOf('RUNTIME = [')));
+for (const f of ['page-tools.js', 'providers.js']) {
+  ok(packList.includes('"' + f + '"'), '打包清单包含 ' + f);
+}
+const localImports = new Set();
+for (const src of [sideJs, optJs, read('providers.js'), toolsSrc]) {
+  for (const m of src.matchAll(/from\s+['"]\.\/([^'"]+)['"]/g)) localImports.add(m[1]);
+}
+ok(localImports.size > 0, '扫描到本地模块引用');
+for (const f of localImports) {
+  ok(packList.includes('"' + f + '"'), '本地模块 ' + f + ' 在打包清单里');
+}
 
 console.log('\n[6] Markdown 渲染');
 const spSrc = sideJs;

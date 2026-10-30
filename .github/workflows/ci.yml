@@ -19,6 +19,15 @@ jobs:
       - name: 自检
         run: node tools/validate.mjs
 
+      - name: 页面工具功能测试（无头 Chrome）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser
+          python3 tools/test-tools.py
+
+      - name: Agent 循环端到端测试（无头 Chrome）
+        run: python3 tools/test-agent.py
+
       - name: 打包
         run: python3 tools/pack.py
 

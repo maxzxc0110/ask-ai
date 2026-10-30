@@ -59,16 +59,28 @@
       <li>你输入的问题；</li>
       <li>当前网页的正文（默认截断到设定字数，可通过「附带正文」开关完全关闭）；</li>
       <li>你在页面上选中的文字；</li>
-      <li>当前会话的上下文历史。</li>
+      <li>当前会话的上下文历史；</li>
+      <li><strong>（仅在开启「页面工具」时）</strong>当前页面的 HTML / CSS / JS 源码片段，以及该页面已发出的网络请求清单（URL、类型、耗时、大小，不含请求体与响应体）。</li>
     </ul>
     <p>该服务商如何处理这些数据，取决于它自己的隐私政策与条款，不受本扩展控制。请只选择你信任的服务商。</p>
   </section>
 
   <section>
-    <h2>4. 权限说明</h2>
+    <h2>4. 页面工具会做什么</h2>
+    <p>「页面工具」默认<strong>可以随时关闭</strong>（侧边栏底部开关或设置页），关闭后扩展只读正文、不做任何交互。开启后，在你的请求下，AI 可以：</p>
     <ul>
-      <li><code>&lt;all_urls&gt;</code>：读取任意页面的正文文本，这是「读取并问答当前网页」这一核心功能所必需的；</li>
-      <li><code>scripting</code>：在页面中注入脚本以提取正文；</li>
+      <li>读取当前页面渲染后的 HTML、内联 CSS、外链 CSS/JS 文本，以及页面已加载的网络资源清单；</li>
+      <li>点击页面上的元素、填写输入框或文本域、滚动页面。</li>
+    </ul>
+    <p>扩展<strong>不会</strong>代替你提交支付、删除数据或输入密码验证码：涉及支付、删除、注销、退订、密码与验证码等操作时，会先弹出确认卡，只有你点了「允许一次」才会执行。它不读取已保存的密码，也不会绕过验证码。</p>
+    <p>扩展<strong>不申请</strong> <code>debugger</code> 权限，因此不会在浏览器顶部出现「正在调试此浏览器」的提示条，也不具备控制浏览器窗口、拦截任意网络响应体或操作文件选择器的能力。</p>
+  </section>
+
+  <section>
+    <h2>5. 权限说明</h2>
+    <ul>
+      <li><code>&lt;all_urls&gt;</code>：读取任意页面的正文文本与（启用页面工具时）页面源码，这是「读取并问答当前网页」这一核心功能所必需的；</li>
+      <li><code>scripting</code>：在页面中注入脚本以提取正文、执行页面工具的点击/填表等操作；</li>
       <li><code>tabs</code> / <code>activeTab</code>：获知当前活动标签页，以便在你切换页面时刷新正文并按页面切换会话；</li>
       <li><code>storage</code>：保存上述本地设置与会话历史；</li>
       <li><code>sidePanel</code>：在浏览器侧边栏中显示扩展界面。</li>
@@ -77,17 +89,17 @@
   </section>
 
   <section>
-    <h2>5. 儿童隐私</h2>
+    <h2>6. 儿童隐私</h2>
     <p>本扩展不面向 13 岁以下儿童，也不会有意收集儿童的个人信息。</p>
   </section>
 
   <section>
-    <h2>6. 政策变更</h2>
+    <h2>7. 政策变更</h2>
     <p>若未来更新扩展并改变数据处理方式（例如新增统计功能），我们会先更新本页面并<strong>在扩展内明示</strong>，同时在 Chrome 商店更新隐私标签。政策变更会同步反映在扩展包中。</p>
   </section>
 
   <section>
-    <h2>7. 联系我们</h2>
+    <h2>8. 联系我们</h2>
     <p>问题或隐私相关请求：<a href="mailto:YOUR_EMAIL@example.com">YOUR_EMAIL@example.com</a>（请替换成你的真实邮箱）</p>
   </section>
 
@@ -96,6 +108,7 @@
     <p><strong>Ask AI · Web Q&amp;A Sidebar collects nothing.</strong> No analytics, no ads, no telemetry, no server of our own. Your API key and chat history stay in your browser's local storage.</p>
     <p>Only when you press send, the page text, your selection and your question are transmitted to <strong>the AI provider you configured in the settings</strong>. That provider's handling of the data is governed by its own policy.</p>
     <p>The <code>&lt;all_urls&gt;</code> permission is required to read the text of the page you are asking about. The extension does not read your browsing history, cookies, bookmarks, saved passwords or downloads.</p>
+    <p>The optional <strong>Page Tools</strong> feature (off by default switch, always visible in the panel) lets the AI read the page's HTML/CSS/JS source and network resource list, and click or fill elements on your request. Sensitive actions (payment, delete, logout, passwords) always require your confirmation first. The extension does not request the <code>debugger</code> permission and never shows a "being debugged" banner.</p>
     <p>Contact: <a href="mailto:YOUR_EMAIL@example.com">YOUR_EMAIL@example.com</a></p>
   </section>
 

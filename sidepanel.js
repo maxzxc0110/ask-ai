@@ -1,4 +1,5 @@
 import { PROVIDER_LIST, getProvider, buildRequest, streamCompletion, readErr } from './providers.js';
+import { TOOLS, TOOL_LABELS, isDangerous, pageToolExec } from './page-tools.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -18,6 +19,7 @@ const els = {
   ctxSize: $('#ctx-size'),
   modelTag: $('#model-tag'),
   toggleBody: $('#toggle-body'),
+  toggleTools: $('#toggle-tools'),
   refresh: $('#refresh'),
   thread: $('#thread'),
   empty: $('#empty'),
@@ -38,6 +40,8 @@ const DEFAULTS = {
   maxTokens: 4096,
   includeBody: true,
   autoSession: true, // 打开新页面自动开新会话
+  allowPageTools: true, // 允许 AI 调用页面工具（读源码 / 点击 / 填表）
+  confirmDangerous: true, // 危险动作需要人工确认
   systemPrompt:
     '你是一个嵌在 Chrome 侧边栏里的网页助手。用户正在浏览一个网页，并把页面内容提供给你。' +
     '请基于页面内容作答：具体、直接、优先引用页面里的原文细节；页面里没有的信息就说明没有，不要编造。' +
@@ -141,6 +145,7 @@ function updateModelTag() {
   const p = getProvider(settings.providerId);
   const kind = settings.protocol && settings.protocol !== 'auto' ? settings.protocol : p.kind;
   els.modelTag.textContent = (settings.model || '未选模型') + ' · ' + kind;
+  updateToolsChip();
 }
 
 /* ---------------- 会话读写 ---------------- */
@@ -398,37 +403,72 @@ function mdToHtml(src) {
 
 /* ---------------- 渲染 ---------------- */
 
+/** 工具活动在界面上的节点表：activity id -> DOM */
+let activityEls = new Map();
+
 function render() {
   els.empty.hidden = messages.length > 0;
   els.thread.querySelectorAll('.msg').forEach((n) => n.remove());
+  activityEls = new Map();
 
-  messages.forEach((m) => {
+  messages.forEach((m, mi) => {
+    if (m.role === 'tool') return; // 工具结果只回传给模型，不显示
     const wrap = document.createElement('div');
     wrap.className = 'msg ' + m.role;
+    wrap.dataset.idx = String(mi);
 
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    if (m.role === 'user') {
-      bubble.textContent = m.text;
-    } else if (m.error) {
-      bubble.innerHTML = '<div class="err"><b>出错了</b>' + escapeHtml(m.text) + '</div>';
-    } else if (m.streaming) {
-      bubble.classList.add('streaming');
-      bubble.textContent = m.text;
-    } else {
-      bubble.innerHTML = mdToHtml(m.text);
-    }
+    const isAssistant = m.role === 'assistant';
+    const hasText = !!(m.text && m.text.trim());
 
-    if (m.role === 'assistant') {
+    if (isAssistant) {
       const role = document.createElement('div');
       role.className = 'msg-role';
       role.textContent = m.providerLabel || 'AI';
       wrap.append(role);
     }
 
-    wrap.append(bubble);
+    // 工具活动块
+    if (isAssistant && m.activity && m.activity.length) {
+      const box = document.createElement('div');
+      box.className = 'activity';
+      for (const a of m.activity) {
+        const row = document.createElement('div');
+        row.className = 'act-row s-' + a.status;
+        row.dataset.act = a.id;
+        const icon = document.createElement('span');
+        icon.className = 'act-icon';
+        icon.textContent = a.status === 'running' ? '◌' : a.status === 'done' ? '✓' : a.status === 'denied' ? '⊘' : '✕';
+        const name = document.createElement('span');
+        name.className = 'act-name';
+        name.textContent = a.label || a.name;
+        const detail = document.createElement('span');
+        detail.className = 'act-detail';
+        detail.textContent = a.detail || '';
+        row.append(icon, name, detail);
+        box.append(row);
+        activityEls.set(a.id, row);
+      }
+      wrap.append(box);
+    }
 
-    if (m.role === 'assistant' && !m.streaming && !m.error) {
+    // 流式中的助手消息即使还没文字也要有气泡，否则流式内容无处显示
+    if (hasText || m.streaming) {
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      if (m.role === 'user') {
+        bubble.textContent = m.text;
+      } else if (m.error) {
+        bubble.innerHTML = '<div class="err"><b>出错了</b>' + escapeHtml(m.text) + '</div>';
+      } else if (m.streaming) {
+        bubble.classList.add('streaming');
+        bubble.textContent = m.text;
+      } else {
+        bubble.innerHTML = mdToHtml(m.text);
+      }
+      wrap.append(bubble);
+    }
+
+    if (isAssistant && hasText && !m.streaming && !m.error) {
       const tools = document.createElement('div');
       tools.className = 'msg-tools';
 
@@ -455,12 +495,14 @@ function render() {
   els.thread.scrollTop = els.thread.scrollHeight;
 }
 
-function updateStreamingBubble(index) {
-  const node = els.thread.querySelectorAll('.msg')[index];
+function updateStreamingBubble(m) {
+  if (!m) return;
+  const idx = messages.indexOf(m);
+  if (idx < 0) return;
+  const node = els.thread.querySelector('.msg[data-idx="' + idx + '"]');
   if (!node) return;
   const bubble = node.querySelector('.bubble');
-  const m = messages[index];
-  if (!bubble || !m) return;
+  if (!bubble) return;
   bubble.classList.add('streaming');
   bubble.textContent = m.text;
   els.thread.scrollTop = els.thread.scrollHeight;
@@ -478,6 +520,15 @@ function clip(text, max) {
 
 function buildSystemText() {
   const parts = [settings.systemPrompt];
+  if (settings.allowPageTools !== false) {
+    parts.push(
+      '\n【页面工具】你可以通过工具直接查看和操作当前网页：' +
+        'page_snapshot 读源码与网络资源、read_page 读正文、inspect 看元素、click 点击、fill 填表、scroll 滚动。' +
+        '需要看代码结构或排查样式/脚本问题时先调 page_snapshot；' +
+        '用户明确要求"帮我点/填/操作"时才动手。' +
+        '工具返回失败就换一种定位方式（先用 inspect 看清楚），不要反复重试同一个失败调用。'
+    );
+  }
   if (settings.includeBody) {
     if (page.ok && page.text) {
       parts.push(
@@ -490,6 +541,169 @@ function buildSystemText() {
     }
   }
   return parts.join('\n');
+}
+
+/* ---------------- 页面工具执行 ---------------- */
+
+const MAX_TOOL_ROUNDS = 8;
+
+/** 在页面上下文执行一个动作 */
+async function execInPage(payload) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab) throw new Error('没有找到活动标签页');
+  const res = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: pageToolExec,
+    args: [payload],
+  });
+  return (res && res[0] && res[0].result) || { ok: false, error: '页面没有返回结果' };
+}
+
+/** 抓取外链 CSS / JS 原文（扩展上下文 fetch，host_permissions 绕过跨域限制） */
+async function fetchExternalSources(urls, maxChars = 12000, maxFiles = 4) {
+  const out = [];
+  let used = 0;
+  for (const url of urls.slice(0, maxFiles)) {
+    if (!/^https?:/i.test(url)) continue;
+    if (used >= maxChars) break;
+    try {
+      const r = await fetch(url, { credentials: 'include' });
+      if (!r.ok) {
+        out.push({ url, error: 'HTTP ' + r.status });
+        continue;
+      }
+      const text = await r.text();
+      const room = Math.min(4000, maxChars - used);
+      const content = text.slice(0, room);
+      used += content.length;
+      out.push({ url, size: text.length, content });
+    } catch (e) {
+      out.push({ url, error: String((e && e.message) || e) });
+    }
+  }
+  return out;
+}
+
+/** 危险动作确认卡片 */
+function requestConfirm(title, reason) {
+  return new Promise((resolve) => {
+    const card = document.createElement('div');
+    card.className = 'confirm-card';
+    const h = document.createElement('div');
+    h.className = 'cc-title';
+    h.textContent = '⚠️ 需要你确认';
+    const act = document.createElement('div');
+    act.className = 'cc-action';
+    act.textContent = title;
+    const rs = document.createElement('div');
+    rs.className = 'cc-reason';
+    rs.textContent = reason || '';
+    const btns = document.createElement('div');
+    btns.className = 'cc-btns';
+    const deny = document.createElement('button');
+    deny.className = 'cc-deny';
+    deny.textContent = '拒绝';
+    const allow = document.createElement('button');
+    allow.className = 'cc-allow';
+    allow.textContent = '允许一次';
+    const done = (v) => {
+      card.remove();
+      resolve(v);
+    };
+    deny.onclick = () => done(false);
+    allow.onclick = () => done(true);
+    btns.append(deny, allow);
+    card.append(h, act, rs, btns);
+    els.thread.append(card);
+    els.thread.scrollTop = els.thread.scrollHeight;
+  });
+}
+
+/** 更新工具活动行 */
+function updateActivity(activity) {
+  const row = activityEls.get(activity.id);
+  if (!row) return;
+  row.className = 'act-row s-' + activity.status;
+  row.querySelector('.act-icon').textContent =
+    activity.status === 'running' ? '◌' : activity.status === 'done' ? '✓' : activity.status === 'denied' ? '⊘' : '✕';
+  row.querySelector('.act-detail').textContent = activity.detail || '';
+}
+
+function activityDetail(result) {
+  if (!result) return '';
+  if (result.error) return result.error;
+  if (result.action === 'snapshot') {
+    const bits = [];
+    if (result.htmlTotal) bits.push('HTML ' + Math.round(result.htmlTotal / 1024) + 'KB');
+    if (result.cssInline && result.cssInline.length) bits.push(result.cssInline.length + ' 段内联 CSS');
+    if (result.cssLinks && result.cssLinks.length) bits.push(result.cssLinks.length + ' 个外链 CSS');
+    if (result.jsInline && result.jsInline.length) bits.push(result.jsInline.length + ' 段内联 JS');
+    if (result.jsLinks && result.jsLinks.length) bits.push(result.jsLinks.length + ' 个外链 JS');
+    if (result.resources && result.resources.length) bits.push(result.resources.length + ' 个网络请求');
+    return bits.join(' · ');
+  }
+  if (result.action === 'read_page') return result.total ? result.total + ' 字' : '';
+  if (result.action === 'inspect') return result.selector || result.tag || '';
+  if (result.action === 'click') return result.label ? '「' + result.label + '」' : result.selector || '';
+  if (result.action === 'fill') return result.field ? '「' + result.field + '」' : '';
+  if (result.action === 'scroll') return result.detail || '';
+  return result.detail || '';
+}
+
+/** 执行一个工具调用 */
+async function runTool(call, activity) {
+  const name = call.name;
+  const args = call.args || {};
+
+  if (name !== 'page_snapshot' && name !== 'read_page' && name !== 'inspect' &&
+      name !== 'click' && name !== 'fill' && name !== 'scroll') {
+    return { ok: false, error: '不认识的工具：' + name };
+  }
+
+  // 危险判定：先用参数判，再用元素实际文本判（探针总是跑，好让确认卡显示真实内容）
+  let risk = isDangerous(name, args);
+  let targetLabel = args.text || args.selector || '';
+  if (name === 'click' || name === 'fill') {
+    let probe = null;
+    try {
+      probe = await execInPage({
+        action: 'inspect',
+        selector: args.selector,
+        text: args.text,
+        index: args.index,
+      });
+    } catch {}
+    if (probe && probe.ok) {
+      targetLabel =
+        name === 'fill'
+          ? probe.field || probe.text || probe.selector || targetLabel
+          : probe.text || probe.selector || targetLabel;
+      risk = isDangerous(name, Object.assign({}, args, { text: targetLabel }));
+    }
+  }
+  if (risk.danger && settings.confirmDangerous !== false) {
+    const what = name === 'click' ? '点击' : name === 'fill' ? '填写' : '执行';
+    const allowed = await requestConfirm(
+      'AI 想' + what + '「' + String(targetLabel).slice(0, 80) + '」',
+      risk.reason
+    );
+    if (!allowed) {
+      return { ok: false, denied: true, error: '用户拒绝了该操作，请不要重试同样的动作' };
+    }
+  }
+
+  const result = await execInPage(Object.assign({ action: name }, args));
+
+  // 页面快照：再把外链 CSS / JS 原文抓回来
+  if (result && result.ok && name === 'page_snapshot') {
+    const urls = [].concat(result.cssLinks || [], result.jsLinks || []);
+    if (urls.length) {
+      const files = await fetchExternalSources(urls, 12000, 4);
+      result.externalFiles = files;
+    }
+  }
+
+  return result;
 }
 
 /* ---------------- 发送 ---------------- */
@@ -514,14 +728,14 @@ async function send(text) {
   const sel = page.selection ? '\n（我选中的是：' + page.selection.slice(0, 300) + '）' : '';
   messages.push({ role: 'user', text: question + sel });
 
-  const assistant = {
+  let assistant = {
     role: 'assistant',
     text: '',
     streaming: true,
+    activity: [],
     providerLabel: provider.label + (useModel ? ' · ' + useModel : ''),
   };
   messages.push(assistant);
-  const idx = messages.length - 1;
   if (sessionId && sessions[sessionId]) sessions[sessionId].model = useModel;
   render();
   touch();
@@ -532,40 +746,114 @@ async function send(text) {
 
   try {
     const sysText = buildSystemText();
-    const history = messages.slice(0, idx).map((m) => ({ role: m.role, text: m.text }));
-    const req = buildRequest(provider, settings, sysText, history);
+    let toolsOn = settings.allowPageTools !== false;
+    let round = 0;
+    let toolRoundDone = false;
 
-    const res = await fetch(req.url, { ...req.init, signal: controller.signal });
-    if (!res.ok) throw new Error(await readErr(res));
+    while (round < MAX_TOOL_ROUNDS) {
+      round++;
+      const cur = assistant;
+      const history = messages
+        .slice(0, messages.indexOf(cur))
+        .map((m) => ({
+          role: m.role,
+          text: m.text,
+          toolCalls: m.toolCalls,
+          toolCallId: m.toolCallId,
+          name: m.name,
+          result: m.result,
+        }));
 
-    let pending = '';
-    const flush = () => {
-      if (!pending) return;
-      assistant.text += pending;
-      pending = '';
-      updateStreamingBubble(idx);
-    };
+      const req = buildRequest(provider, settings, sysText, history, toolsOn ? TOOLS : []);
 
-    await streamCompletion(
-      res,
-      req.kind,
-      (piece) => {
-        pending += piece;
-        if (!renderTimer) {
-          renderTimer = setTimeout(() => {
-            renderTimer = null;
-            flush();
-          }, 90);
+      const res = await fetch(req.url, { ...req.init, signal: controller.signal });
+      if (!res.ok) {
+        const errText = await readErr(res);
+        // 有些中转站/老模型不认 tools 参数，收到 400 就退回纯对话模式重试一次
+        if (toolsOn && !toolRoundDone && res.status === 400 && /tool|function|schema/i.test(errText)) {
+          toolsOn = false;
+          cur.streaming = false;
+          render();
+          continue;
         }
-      },
-      controller.signal
-    );
+        throw new Error(errText);
+      }
 
-    if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
-    flush();
+      let pending = '';
+      const flush = () => {
+        if (!pending) return;
+        cur.text += pending;
+        pending = '';
+        updateStreamingBubble(cur);
+      };
 
-    assistant.streaming = false;
-    if (!assistant.text.trim()) assistant.text = '（模型没有返回内容）';
+      const out = await streamCompletion(
+        res,
+        req.kind,
+        (piece) => {
+          pending += piece;
+          if (!renderTimer) {
+            renderTimer = setTimeout(() => {
+              renderTimer = null;
+              flush();
+            }, 90);
+          }
+        },
+        controller.signal
+      );
+
+      if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
+      flush();
+
+      cur.streaming = false;
+      const toolCalls = out.toolCalls || [];
+
+      if (!toolCalls.length) {
+        if (!cur.text.trim()) cur.text = '（模型没有返回内容）';
+        break;
+      }
+
+      toolRoundDone = true;
+      cur.toolCalls = toolCalls;
+      cur.activity = cur.activity || [];
+
+      for (const call of toolCalls) {
+        const activity = {
+          id: call.id,
+          name: call.name,
+          label: TOOL_LABELS[call.name] || call.name,
+          status: 'running',
+          detail: '',
+        };
+        cur.activity.push(activity);
+        render();
+        updateActivity(activity);
+
+        let result;
+        try {
+          result = await runTool(call, activity);
+        } catch (e) {
+          result = { ok: false, error: String((e && e.message) || e) };
+        }
+
+        activity.status = result.ok ? 'done' : result.denied ? 'denied' : 'error';
+        activity.detail = activityDetail(result);
+        updateActivity(activity);
+
+        messages.push({ role: 'tool', toolCallId: call.id, name: call.name, result });
+      }
+
+      // 下一轮：模型看到工具结果后继续
+      assistant = {
+        role: 'assistant',
+        text: '',
+        streaming: true,
+        activity: [],
+        providerLabel: provider.label + (useModel ? ' · ' + useModel : ''),
+      };
+      messages.push(assistant);
+      render();
+    }
   } catch (e) {
     if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
     const aborted = e && e.name === 'AbortError';
@@ -606,6 +894,14 @@ async function regenerate(index) {
 function setBusyUI(state) {
   els.send.hidden = state;
   els.stop.hidden = !state;
+}
+
+/** 页面工具开关状态 */
+function updateToolsChip() {
+  if (!els.toggleTools) return;
+  const on = settings.allowPageTools !== false;
+  els.toggleTools.classList.toggle('is-on', on);
+  els.toggleTools.textContent = on ? '⚙ 页面工具 开' : '⚙ 页面工具 关';
 }
 
 function autoGrow() {
@@ -678,6 +974,12 @@ function bind() {
     const on = !settings.includeBody;
     els.toggleBody.classList.toggle('is-on', on);
     await saveSettings({ includeBody: on });
+  });
+
+  els.toggleTools.addEventListener('click', async () => {
+    const on = !(settings.allowPageTools !== false);
+    await saveSettings({ allowPageTools: on });
+    updateToolsChip();
   });
 
   els.send.addEventListener('click', () => send(els.input.value));

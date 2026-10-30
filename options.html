@@ -106,11 +106,33 @@
           </span>
           <span class="hint">关闭后，所有页面共用当前这个会话。</span>
         </label>
+
+        <label class="field switch-field">
+          <span class="lbl">允许 AI 操作当前页面</span>
+          <span class="switch">
+            <input type="checkbox" id="allowPageTools" />
+            <span class="track"><span class="knob"></span></span>
+          </span>
+          <span class="hint">
+            开启后 AI 可以读页面源码与网络资源清单，也可以点击按钮、填写输入框、滚动页面。侧边栏底部有快捷开关。
+          </span>
+        </label>
+
+        <label class="field switch-field">
+          <span class="lbl">危险操作需要我确认</span>
+          <span class="switch">
+            <input type="checkbox" id="confirmDangerous" />
+            <span class="track"><span class="knob"></span></span>
+          </span>
+          <span class="hint">
+            涉及支付、删除、注销、密码验证码等动作时，先弹确认卡等你点头；关掉则 AI 直接执行。
+          </span>
+        </label>
       </section>
     </div>
 
     <footer class="foot">
-      <span class="mono" id="foot-note">Ask AI · 网页问答助手 v1.0.0</span>
+      <span class="mono" id="foot-note">Ask AI · 网页问答助手 v1.2.0</span>
       <div class="foot-actions">
         <button id="reset" class="ghost danger">恢复默认</button>
         <button id="save" class="btn solid">保存</button>

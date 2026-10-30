@@ -103,8 +103,26 @@ export function resolveBase(provider, settings) {
   return (custom || provider.base || '').replace(/\/+$/, '');
 }
 
-/** 把 UI 层的 {role:'user'|'assistant', text} 转成各家请求体 */
-export function buildRequest(provider, settings, sysText, history) {
+const safeJson = (s) => {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return {};
+  }
+};
+
+const asText = (v) => (typeof v === 'string' ? v : JSON.stringify(v == null ? '' : v));
+
+/**
+ * 构造请求体。
+ * @param {object} provider
+ * @param {object} settings
+ * @param {string} sysText
+ * @param {Array} turns 统一结构的历史：
+ *   {role:'user', text} | {role:'assistant', text, toolCalls:[{id,name,args}]} | {role:'tool', toolCallId, name, result}
+ * @param {Array} [tools] 工具定义（统一格式），为空则不启用工具调用
+ */
+export function buildRequest(provider, settings, sysText, turns, tools) {
   const base = resolveBase(provider, settings);
   const key = (settings.apiKey || '').trim();
   const model = (settings.model || '').trim() || provider.models[0];
@@ -116,10 +134,51 @@ export function buildRequest(provider, settings, sysText, history) {
 
   if (!base) throw new Error('没有配置 API Base URL，请到设置页填写');
 
+  const history = (turns || []).filter((m) => m && m.role !== 'system');
+  const useTools = Array.isArray(tools) && tools.length > 0;
+
   if (kind === 'anthropic') {
-    const messages = history
-      .filter((m) => m.role !== 'system')
-      .map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: [{ type: 'text', text: m.text }] }));
+    const messages = [];
+    for (const m of history) {
+      if (m.role === 'user') {
+        messages.push({ role: 'user', content: [{ type: 'text', text: m.text || '' }] });
+      } else if (m.role === 'assistant') {
+        const content = [];
+        if (m.text) content.push({ type: 'text', text: m.text });
+        for (const c of m.toolCalls || []) {
+          content.push({ type: 'tool_use', id: c.id, name: c.name, input: c.args || {} });
+        }
+        if (content.length) messages.push({ role: 'assistant', content });
+      } else if (m.role === 'tool') {
+        const isErr = m.result && m.result.error;
+        messages.push({
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: m.toolCallId,
+              content: asText(m.result),
+              is_error: !!isErr,
+            },
+          ],
+        });
+      }
+    }
+    const body = {
+      model,
+      max_tokens: settings.maxTokens || 4096,
+      temperature,
+      system: sysText,
+      messages,
+      stream: true,
+    };
+    if (useTools) {
+      body.tools = tools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        input_schema: t.parameters,
+      }));
+    }
     return {
       url: `${base}/messages`,
       kind,
@@ -131,25 +190,44 @@ export function buildRequest(provider, settings, sysText, history) {
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true',
         },
-        body: JSON.stringify({
-          model,
-          max_tokens: settings.maxTokens || 4096,
-          temperature,
-          system: sysText,
-          messages,
-          stream: true,
-        }),
+        body: JSON.stringify(body),
       },
     };
   }
 
   if (kind === 'gemini') {
-    const contents = history
-      .filter((m) => m.role !== 'system')
-      .map((m) => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.text }],
-      }));
+    const contents = [];
+    for (const m of history) {
+      if (m.role === 'user') {
+        contents.push({ role: 'user', parts: [{ text: m.text || '' }] });
+      } else if (m.role === 'assistant') {
+        const parts = [];
+        if (m.text) parts.push({ text: m.text });
+        for (const c of m.toolCalls || []) parts.push({ functionCall: { name: c.name, args: c.args || {} } });
+        if (parts.length) contents.push({ role: 'model', parts });
+      } else if (m.role === 'tool') {
+        contents.push({
+          role: 'user',
+          parts: [{ functionResponse: { name: m.name, response: m.result || {} } }],
+        });
+      }
+    }
+    const body = {
+      system_instruction: { parts: [{ text: sysText }] },
+      contents,
+      generationConfig: { temperature, maxOutputTokens: settings.maxTokens || 8192 },
+    };
+    if (useTools) {
+      body.tools = [
+        {
+          function_declarations: tools.map((t) => ({
+            name: t.name,
+            description: t.description,
+            parameters: t.parameters,
+          })),
+        },
+      ];
+    }
     const url =
       `${base}/models/${encodeURIComponent(model)}:streamGenerateContent` +
       `?alt=sse&key=${encodeURIComponent(key)}`;
@@ -159,24 +237,49 @@ export function buildRequest(provider, settings, sysText, history) {
       init: {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: sysText }] },
-          contents,
-          generationConfig: { temperature, maxOutputTokens: settings.maxTokens || 8192 },
-        }),
+        body: JSON.stringify(body),
       },
     };
   }
 
   // openai 兼容
-  const messages = [{ role: 'system', content: sysText }, ...history.map((m) => ({ role: m.role, content: m.text }))];
+  const messages = [{ role: 'system', content: sysText }];
+  for (const m of history) {
+    if (m.role === 'user') {
+      messages.push({ role: 'user', content: m.text || '' });
+    } else if (m.role === 'assistant') {
+      const msg = { role: 'assistant', content: m.text || null };
+      if (m.toolCalls && m.toolCalls.length) {
+        msg.tool_calls = m.toolCalls.map((c) => ({
+          id: c.id,
+          type: 'function',
+          function: { name: c.name, arguments: JSON.stringify(c.args || {}) },
+        }));
+      }
+      messages.push(msg);
+    } else if (m.role === 'tool') {
+      messages.push({
+        role: 'tool',
+        tool_call_id: m.toolCallId,
+        content: asText(m.result),
+      });
+    }
+  }
+  const body = { model, messages, temperature, stream: true };
+  if (useTools) {
+    body.tools = tools.map((t) => ({
+      type: 'function',
+      function: { name: t.name, description: t.description, parameters: t.parameters },
+    }));
+    body.tool_choice = 'auto';
+  }
   return {
     url: `${base}/chat/completions`,
     kind,
     init: {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, messages, temperature, stream: true }),
+      body: JSON.stringify(body),
     },
   };
 }
@@ -197,13 +300,18 @@ function deltaOf(kind, obj) {
   return (ch.delta && ch.delta.content) || '';
 }
 
-/** 读 SSE，逐段回调；返回拼接后的完整文本 */
+/**
+ * 读 SSE，逐段回调文本；同时收集工具调用。
+ * @returns {{text:string, toolCalls:Array<{id:string,name:string,args:object}>}}
+ */
 export async function streamCompletion(res, kind, onDelta, signal) {
   if (!res.body) throw new Error('这个端点没有返回流式响应');
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   let full = '';
+  const toolAcc = new Map(); // index -> {id, name, argsText}
+  let geminiCalls = [];
 
   const handleBlock = (block) => {
     for (const rawLine of block.split('\n')) {
@@ -220,6 +328,38 @@ export async function streamCompletion(res, kind, onDelta, signal) {
       if (obj.error) {
         throw new Error(obj.error.message || '上游返回 error');
       }
+
+      // —— 工具调用收集 ——
+      if (kind === 'openai') {
+        const ch = obj.choices && obj.choices[0];
+        const tcs = (ch && ch.delta && ch.delta.tool_calls) || [];
+        for (const tc of tcs) {
+          const idx = tc.index == null ? 0 : tc.index;
+          const acc = toolAcc.get(idx) || { id: '', name: '', argsText: '' };
+          if (tc.id) acc.id = tc.id;
+          if (tc.function && tc.function.name) acc.name += tc.function.name;
+          if (tc.function && tc.function.arguments) acc.argsText += tc.function.arguments;
+          toolAcc.set(idx, acc);
+        }
+      } else if (kind === 'anthropic') {
+        if (obj.type === 'content_block_start' && obj.content_block && obj.content_block.type === 'tool_use') {
+          toolAcc.set(obj.index, {
+            id: obj.content_block.id || '',
+            name: obj.content_block.name || '',
+            argsText: '',
+          });
+        } else if (obj.type === 'content_block_delta' && obj.delta && obj.delta.type === 'input_json_delta') {
+          const acc = toolAcc.get(obj.index);
+          if (acc) acc.argsText += obj.delta.partial_json || '';
+        }
+      } else if (kind === 'gemini') {
+        const parts =
+          (obj.candidates && obj.candidates[0] && obj.candidates[0].content && obj.candidates[0].content.parts) || [];
+        for (const part of parts) {
+          if (part.functionCall) geminiCalls.push(part.functionCall);
+        }
+      }
+
       const piece = deltaOf(kind, obj);
       if (piece) {
         full += piece;
@@ -247,7 +387,25 @@ export async function streamCompletion(res, kind, onDelta, signal) {
       reader.releaseLock();
     } catch {}
   }
-  return full;
+
+  let toolCalls = [];
+  if (kind === 'gemini') {
+    toolCalls = geminiCalls.map((c, i) => ({
+      id: 'call_' + Date.now().toString(36) + '_' + i,
+      name: c.name,
+      args: c.args || {},
+    }));
+  } else {
+    toolCalls = Array.from(toolAcc.values())
+      .filter((a) => a.name)
+      .map((a, i) => ({
+        id: a.id || 'call_' + Date.now().toString(36) + '_' + i,
+        name: a.name,
+        args: safeJson(a.argsText),
+      }));
+  }
+
+  return { text: full, toolCalls };
 }
 
 /** 非流式测试连通性 */

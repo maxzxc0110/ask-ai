@@ -5,7 +5,7 @@
 | 字段 | 内容 |
 |---|---|
 | 名称 | Ask AI · 网页问答助手 |
-| 简短说明（≤132 字符） | 用你自己的 AI（OpenAI / Claude / Gemini / DeepSeek / Kimi / GLM / 通义 / OpenRouter / 本地 Ollama）在侧边栏读取并问答当前网页。 |
+| 简短说明（≤132 字符） | 用你自己的 AI（OpenAI / Claude / Gemini / DeepSeek / Kimi / GLM / 通义 / OpenRouter / 本地 Ollama）在侧边栏读取并问答当前网页，还能读源码、点按钮。 |
 | 类别 | Productivity（工作流程） |
 | 语言 | 中文（简体）/ English（可提交两个语言版本） |
 | 图标 | `screenshots/../icon128.png` → 取自扩展 `icons/icon128.png`（128×128 PNG） |
@@ -27,6 +27,9 @@ Ask AI · 网页问答助手 —— 让你正在看的这个网页，直接开�
 · 选中即问：在页面上选中一段文字提问，问题会自动带上选区
 · 按页面自动分会话：打开新页面自动开新会话，同一页面的追问留在同一会话里
 · 随时手动新建会话：顶栏一键新建独立会话，也可以随时切换回之前的会话
+· 一个订阅多个模型：设置页填多个模型，顶栏下拉随时切换，每个会话记住自己用的那个
+· 页面工具（可选开启）：让 AI 读当前页面的 HTML / CSS / JS 源码与网络请求清单，
+  也可以帮你点击按钮、填写输入框、滚动页面；支付、删除、注销、密码这类危险动作会先问你一句
 · 流式回答：边写边出，可随时点停；支持 Markdown（标题、列表、代码块、链接）
 · 复制 / 重新生成：答案一键复制，或换个说法再来一次
 
@@ -39,6 +42,7 @@ OpenAI、Claude、Gemini、DeepSeek、Kimi（Moonshot）、智谱 GLM、通义�
 
 API Key 和对话记录只保存在你本机的浏览器存储里。扩展本身不收集、不上传、不出售任何数据，也没有广告或统计 SDK。你填的服务商收不收、怎么收，取决于你选的那一家。
 只有当你主动点击发送时，页面正文和问题才会发往你配置的 AI 服务商。
+开启「页面工具」后，AI 还可能在你授权下读取当前页面的 HTML/CSS/JS 源码和网络请求清单，并点击页面上的元素；这些内容同样只发往你配置的 AI 服务商，不会发往别处。危险操作会先弹窗确认。
 
 ■ 说明
 
@@ -60,6 +64,8 @@ FEATURES
 • Ask about a selection: select any text on the page and it is attached to your question
 • One session per page: opening a new page starts a new conversation; follow-ups on the same page stay together
 • Start conversations yourself: one click for a fresh standalone session, and a dropdown to switch back to any earlier one
+• Several models per subscription: list them in settings and switch from the dropdown; each chat remembers its own model
+• Optional page tools: let the AI read the page's HTML / CSS / JS source and network request list, and click buttons, fill forms or scroll for you. Sensitive actions (payment, delete, logout, passwords) always ask first
 • Streaming answers with a stop button, rendered Markdown (headings, lists, code blocks, links)
 • Copy or regenerate any answer
 
@@ -72,6 +78,7 @@ PRIVACY
 
 Your API key and conversation history stay in your browser's local storage. The extension collects, uploads and sells nothing, and contains no ads or analytics. Whatever your chosen provider does with your data is between you and that provider.
 Page content and your questions are sent to the AI service you configured only when you press send.
+If you enable Page Tools, the AI may additionally read the page's HTML/CSS/JS source and its network request list, and interact with elements — only after your request, only to the provider you configured, and always with a confirmation prompt for sensitive actions.
 
 NOTE
 
@@ -92,7 +99,7 @@ AI 助手, 网页总结, 侧边栏, 划词提问, ChatGPT, Claude, Gemini, DeepS
 
 | 文件 | 内容 |
 |---|---|
-| `screenshots/01-overview.png` | 网页 + 侧边栏空态（快捷提问） |
+| `screenshots/01-overview.png` | 网页 + 侧边栏空态 |
 | `screenshots/02-chat.png` | 网页 + 侧边栏问答中（主力图） |
 | `screenshots/03-settings.png` | 设置页（说明自带密钥模式） |
 
